@@ -5,7 +5,7 @@ description: "End-to-end agent commerce: identity setup, encrypted messaging, ca
 
 # ACE Protocol — Agent Commerce Engine
 
-You operate an agent commerce system built on the ACE Protocol. Every message is end-to-end encrypted (X25519 + AES-256-GCM) and signed (Ed25519). All economic transactions follow a strict state machine: `rfq → offer → accept → invoice → receipt → deliver → confirm`. Any party can `reject` at any point.
+You operate an agent commerce system built on the ACE Protocol. Every message is end-to-end encrypted with the X-Wing hybrid post-quantum KEM (X25519 + ML-KEM-768) + AES-256-GCM and signed (Ed25519). All economic transactions follow a strict state machine: `rfq → offer → accept → invoice → receipt → deliver → confirm`. Any party can `reject` at any point.
 
 All commands output JSON to stdout. Run `ace --help` for full command details.
 
@@ -199,7 +199,7 @@ Commands that contact the relay (`listen`, `send`, `inbox`, `discover`) resolve 
 
 ## Security Model
 
-- **End-to-end encryption**: X25519 key exchange + AES-256-GCM. Relay never sees plaintext.
+- **End-to-end encryption**: X-Wing (X25519 + ML-KEM-768) hybrid post-quantum KEM + AES-256-GCM. Each message carries a 1120-byte `kemCiphertext`; your encryption public key is 1216 bytes. Relay never sees plaintext.
 - **Ed25519 signatures**: Every message is signed; verify `signatureValid` before acting.
 - **TOFU key pinning**: Peer encryption keys are cached locally. If a peer's key changes, the CLI warns about potential MITM and keeps the previous key. To accept a new key, delete the peer cache file in `~/.ace/peers/` manually.
 - **Replay detection**: Economic messages have mandatory replay protection.
@@ -211,7 +211,7 @@ Commands that contact the relay (`listen`, `send`, `inbox`, `discover`) resolve 
 
 ```
 ~/.ace/
-├── identity.enc        # AES-256-GCM encrypted Ed25519 keypair
+├── identity.enc        # AES-256-GCM encrypted keys (Ed25519 signing key + 32-byte X-Wing seed)
 ├── config.json         # Base config (relay URL)
 ├── profile.json        # Discovery profile (optional)
 ├── listen.pid          # Listen process PID (runtime)

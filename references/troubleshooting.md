@@ -106,7 +106,7 @@ If you see `No relay URL configured`, configure one via any of these (in resolut
 
 If you see `[security] TOFU violation: peer ... encryption key changed!`:
 
-**What it means:** A previously cached peer encryption public key doesn't match the newly received one. This could indicate a relay man-in-the-middle attack.
+**What it means:** A previously cached peer encryption public key (1216-byte X-Wing key) doesn't match the newly received one. This could indicate a relay man-in-the-middle attack.
 
 **What happens:** The CLI automatically keeps the previously cached key and rejects the new one.
 

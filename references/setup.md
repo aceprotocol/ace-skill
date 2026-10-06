@@ -11,7 +11,7 @@ Guide a merchant through identity creation, configuration, and going online.
 
 ### 1. Initialize Identity
 
-Run `ace init` in the merchant's project directory. This generates an Ed25519 keypair, encrypts it to `~/.ace/identity.enc`, and creates `~/.ace/config.json`.
+Run `ace init` in the merchant's project directory. This generates an Ed25519 signing keypair and an X-Wing (X25519 + ML-KEM-768) encryption key, encrypts them to `~/.ace/identity.enc`, and creates `~/.ace/config.json`.
 
 You can set the discovery profile at the same time:
 
@@ -171,7 +171,7 @@ After initialization:
 
 ```
 ~/.ace/
-├── identity.enc        # AES-256-GCM encrypted Ed25519 keypair
+├── identity.enc        # AES-256-GCM encrypted keys (Ed25519 signing key + 32-byte X-Wing seed)
 ├── config.json         # Base config (relay URL)
 ├── profile.json        # Discovery profile (optional)
 ├── listen.pid          # Listen process PID (runtime)

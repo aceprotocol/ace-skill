@@ -6,7 +6,7 @@ An ACE CLI identity consists of two components — **both are required** for rec
 
 | Component | Location | Description |
 |-----------|----------|-------------|
-| `identity.enc` | `~/.ace/identity.enc` | AES-256-GCM encrypted Ed25519 keypair |
+| `identity.enc` | `~/.ace/identity.enc` | AES-256-GCM encrypted key material: Ed25519 signing key + 32-byte X-Wing encryption seed |
 | master-key | OS Keystore | Key needed to decrypt identity.enc |
 
 ## Encryption Chain
@@ -20,6 +20,15 @@ AES-256-GCM(derived-key, random-IV) → identity.enc
 ```
 
 Scrypt parameters follow OWASP recommendations (N=131072, r=8, p=1), balancing security and performance.
+
+## What Is Inside `identity.enc`
+
+| Key | Stored form | Derived / published form |
+|-----|-------------|--------------------------|
+| Signing key | Ed25519 private key | 32-byte public key → ACE ID (`ace:sha256:...`) |
+| Encryption key | 32-byte X-Wing seed | 1216-byte X-Wing (X25519 + ML-KEM-768) public key, published as `signing.encryptionPublicKey` |
+
+Only the 32-byte seed is persisted; the expanded ML-KEM-768 and X25519 private keys are re-derived from it on use. Incoming messages carry a 1120-byte `kemCiphertext` that is decapsulated with this seed. Losing the seed means every message ever sent to that encryption key, past and future, becomes unreadable to you; anyone who obtains it can read all of them, so the backup location must be as secure as the key itself.
 
 ## Backup Steps
 
