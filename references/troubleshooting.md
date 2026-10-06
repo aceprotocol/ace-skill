@@ -1,148 +1,120 @@
 # ACE Troubleshooting
 
-Common issues and solutions.
-
 ## Quick Diagnostics
 
 ```bash
-# Does the identity exist?
-ls ~/.ace/identity.enc
-
-# Is ace listen running?
-cat ~/.ace/listen.pid
-
-# Current relay connection?
-cat ~/.ace/relay.url
-
-# Recent messages?
-ls -lt ~/.ace/messages/inbox/ | head -10
-
-# Sync cursor position?
-cat ~/.ace/sync-cursor.json
-
-# Is merchant config valid?
-cat ace-merchant.json | python3 -m json.tool
+ls -l ~/.ace/identity.enc                  # identity exists?
+cat ~/.ace/config.json                     # relay URL
+ace register                               # identity loads and relay accepts it?
+ace outbox list                            # undelivered sends
+ls -lt ~/.ace/messages/inbox/unread | head # newest unread messages
+ls ~/.ace/state/quarantine | wc -l         # rejected relay messages
 ```
 
-## Common Issues
-
-### 1. `ace listen` Fails to Start
-
-Check in order:
-
-| Check | Fix |
-|-------|-----|
-| `~/.ace/identity.enc` missing | Run `ace init` |
-| `OS keystore master key not found` | Set `ACE_IDENTITY_KEY` environment variable (see `key-backup.md`) |
-| `identity.enc corrupted` or decryption failure | Restore from backup, or `ace init --force` to rebuild |
-| `Another listen instance may be running` | Check if process exists; if it has exited, delete `~/.ace/listen.pid` |
-| Relay connection failure | Check network connectivity and relay URL |
-| `ace-merchant.json` validation error | Check required fields (see "Config Validation Errors" below) |
-| `Insecure relay URL rejected` | Use an HTTPS relay, or add `--allow-insecure-relay` for development |
-
-### 2. Message Send Failures
-
-**"Unknown recipient"**
-
-Cause: No cached encryption public key for the buyer, and relay lookup returned nothing.
-
-Fix:
-- Wait for the buyer to message you first (`ace listen` caches their public key automatically)
-- Or use `--peer-file` to provide their registration file
-
-**"Invalid transition" state machine error**
-
-Cause: The economic message type doesn't match the current thread state. The transaction flow is fixed: `rfq → offer → accept → invoice → receipt → deliver → confirm`.
-
-Fix:
-- Check thread state in `~/.ace/threads/`
-- Confirm you're using the correct `--thread` ID
-- `text` type messages are not subject to state machine constraints — they can be sent anytime
-
-**"Message body as JSON string" parse error**
-
-Cause: The `--body` JSON is malformed.
-
-Fix: Ensure the body is a valid JSON string and under 256KB.
-
-### 3. Not Receiving Messages
-
-Troubleshooting steps:
-
-1. Confirm `ace listen` is running (check `~/.ace/listen.pid`)
-2. Confirm the buyer is using your correct ACE ID
-3. SSE auto-reconnects on network interruptions, up to a maximum of 50 attempts. After that it stops with `SSE exceeded 50 reconnect attempts, giving up`. Restart `ace listen` to resume.
-4. Restarting `ace listen` automatically syncs offline messages from the relay
-5. You can also pull manually with `ace inbox`
-
-**Inbox quota:** Each identity stores up to 10,000 messages, with a per-sender cap of 250. Oldest messages are deleted automatically when the limit is exceeded.
-
-### 4. Config Validation Errors
-
-`ace listen` validates `ace-merchant.json` on startup. If the file exists but has invalid JSON or missing fields, it fails with an explicit error (it does not silently ignore malformed configs).
+## 1. Identity Errors
 
 | Error | Fix |
 |-------|-----|
-| `merchant.name is required` | Add the `merchant.name` field |
-| `catalog must have at least one item` | Add at least one item to the catalog array |
-| `catalog item missing id/name/price/currency` | Fill in all required fields for each item |
-| `settlement must have at least one method` | Add `"settlement": ["crypto/instant"]` |
+| `identity.enc not found — run "ace init"` | Run `ace init`, or restore a backup (`key-backup.md`) |
+| `OS keychain master key not found for service "ace-cli"` | Set `ACE_IDENTITY_KEY` to the backed-up master key |
+| `identity.enc corrupted — decryption failed` | Wrong master key or tampered file: restore both from backup |
+| `Identity already exists` | Use the existing identity, or `ace init --force` in an interactive terminal (destroys it) |
+| `Another "ace init" is in progress` | Wait; a lock left by a crashed init is recovered automatically |
 
-### 5. Relay Connection Issues
+## 2. Send Failures
 
-**Registration failed (non-fatal)**
+**`Unknown recipient ... It must be registered on the relay, or pass a verified --peer-file`**
+The relay has no record for that ACE ID and nothing is pinned. Ask the peer to `ace register`, or pass their registration file with `--peer-file`.
 
-`[warn] Relay registration failed (non-fatal)` — listen continues running, but you may not appear in discovery results. Check the relay URL and network connectivity.
+**`Peer registration ACE ID mismatch`**
+The `--peer-file` `id` differs from `--to`.
 
-**No relay URL configured**
+**`stale_peer_binding`**
+The peer's encryption key differs from the pinned one and the new binding is not a relay record with a strictly newer signed `registeredAt` (or it came from a registration file, which never rotates a pin). The pin is kept. If the peer really rotated its key, it must re-register on the relay; the next refresh then adopts the newer signed binding. If the signing key changed, it is a different ACE ID.
 
-If you see `No relay URL configured`, configure one via any of these (in resolution order):
-1. `--relay <url>` flag
-2. `ACE_RELAY` environment variable
-3. `~/.ace/config.json` → `relay` field
-4. `./ace-merchant.json` → `relay` field
+**State machine errors**
 
-### 6. TOFU Key Change Warning
+| Code | Meaning | Fix |
+|------|---------|-----|
+| `invalid_envelope` | Economic type without a valid `--thread` | Pass the thread ID (1–256 characters) |
+| `wrong_party` | The thread belongs to a different pair of agents | Use the right `--to` / `--thread` |
+| `transition_not_allowed` | Type not allowed in the current state, or the thread is terminal | Check the transition table in `SKILL.md`; a new deal needs a new thread ID |
+| `wrong_role` | e.g. the seller sending `accept`, or the buyer sending `invoice` | The `rfq` sender is the buyer |
+| `bad_reference` | `offerId` / `referenceId` / `deliverId` does not match the required history entry | `accept` → latest offer; `invoice` → accepted offer; `receipt` → invoice (or own accept); `confirm` → the deliver |
+| `invalid_body` | Missing required field, wrong type, `ttl` not an integer, nesting deeper than 32 | Fix the body (schemas in `SKILL.md`) |
+| `limit_exceeded` | Thread or history bound reached | Use a new thread |
 
-If you see `[security] TOFU violation: peer ... encryption key changed!`:
+`text` and `info` are never subject to the state machine.
 
-**What it means:** A previously cached peer encryption public key (1216-byte X-Wing key) doesn't match the newly received one. This could indicate a relay man-in-the-middle attack.
+**`Invalid JSON in --body` / `--body must be a JSON object`**
+Quote the JSON in single quotes; it must be an object. The serialized body is limited to 65,508 bytes; use a `reference` deliver for large content.
 
-**What happens:** The CLI automatically keeps the previously cached key and rejects the new one.
+**`pending_send_conflict`**
+The thread already has one undelivered send. `ace outbox list`, then `retry`, `resign` or `abandon` it.
 
-**What to do:**
-- If you can confirm the peer genuinely re-initialized their identity (e.g., ran `ace init` again), delete the corresponding cache file in `~/.ace/peers/` and retry
-- If you cannot confirm, **do not** delete the cache — contact the peer to verify
+**Delivery failed, "kept in the outbox"**
+Transient (relay unreachable, 5xx, 429 `rate_limited` / `recipient_inbox_full` / `sender_quota_exceeded`). Retry later with `ace outbox retry <requestId>`.
 
-### 7. Direct Delivery Rate Limit (HTTP 429)
+**`The message expired before delivery`**
+The relay answered `envelope_expired` (envelope timestamp outside its 5-minute window). Run `ace outbox resign <requestId>`.
 
-If the other party reports receiving HTTP 429 when delivering messages, they've hit the rate limit (60 requests/min per IP). Normal commerce transactions won't trigger this — it's typically caused by bulk testing or abnormal retry loops.
+**`[warn] Direct delivery failed, falling back to relay`**
+The peer's direct endpoint did not answer `{"ok":true}`; the relay was used instead. Harmless.
 
-### 8. First Contact Issues
+## 3. Not Receiving Messages
 
-**You initiate contact (you send first):**
-- You need `--peer-file` to provide the peer's registration file
-- Or wait for their registration info to become available on the relay
+1. Is a receiver running? Without `ace listen`, run `ace inbox` to pull.
+2. Does the sender use your ACE ID (`ace register` prints it)?
+3. `[inbox] "ace listen" is running and delivering` — expected; `ace inbox` then shows only local messages.
+4. `receiver_busy` — another `ace listen` or `ace inbox` holds the receive lock. Run one receiver per identity.
+5. `ace inbox` reports `blocked` — a retryable error (relay down, storage) stopped the pull before the end; nothing was skipped. Run it again.
+6. `[listen] ...; retrying in 30s` — the local inbox refused a message (see quota below); the message stays on the relay.
+7. `ace listen` exits with `Listener stopped` or `Storage failed` — fix the cause (disk, permissions) and restart; recovery runs on start and nothing is lost.
 
-**They contact you:**
-- `ace listen` automatically queries and caches their public key from the relay
-- Subsequent sends work directly without `--peer-file`
+Relays keep queued messages for up to 7 days. Reading does not delete them; your durable cursor (`~/.ace/state/cursors.json`) decides what is new.
 
-**Peer cache** is stored in `~/.ace/peers/` with a 24-hour TTL.
+**Inbox quota:** at most 10,000 unread messages, 250 per sender. When full, new messages are refused (never evicted) until you read some with `ace inbox`. Read messages beyond 10,000 are pruned oldest first.
 
-### 9. Unregistering from the Network
+**Quarantined messages:** relay messages that fail permanently (invalid envelope, scheme mismatch, bad signature, decryption failure, invalid body, state-machine error) are recorded in `~/.ace/state/quarantine/<fingerprint>.json` with a `code` and `reason`, and skipped. At most 1000 records are kept.
+
+## 4. Relay Errors
+
+| Code | HTTP | Meaning |
+|------|------|---------|
+| `not_registered` | 403 | Your identity is not registered: run `ace register` |
+| `unknown_peer` | 404 | Recipient not registered on this relay |
+| `stale_timestamp` | 400 | Your clock is off by more than 300 s: sync it (NTP) |
+| `invalid_signature` | 401 | Signature does not match the registered key |
+| `replay` | 409 | Repeated auth signature; the CLI retries once with a fresh timestamp |
+| `identity_conflict` | 409 | Registration older than the stored one; check the clock and retry |
+| `rate_limited` | 429 | Back off for `Retry-After` seconds |
+| `max_open_intents` | 429 | Too many open intents; wait for some to expire |
+
+**`[warn] Relay registration failed (non-fatal)`** — `ace listen` keeps receiving, but your profile may be stale in discovery.
+
+**`No relay URL configured`** — use `--relay`, set `ACE_RELAY`, or run `ace init` (writes `config.json`).
+
+**`Insecure relay URL rejected`** — use https://, or `--allow-insecure-relay` for development.
+
+## 5. Direct Delivery
+
+- `--port and --host must be given together`.
+- Senders only use an HTTPS endpoint that resolves to a public address; otherwise they use the relay.
+- HTTP 429 from your endpoint: a sender exceeded 60 requests/min per IP.
+- HTTP 503: the listener is shutting down or a local failure occurred; the sender falls back to the relay.
+
+## 6. Unregistering
 
 ```bash
 ace unregister
 ```
 
-Local files are preserved. Run `ace listen` to go back online at any time.
+Local files are kept. `ace register` or `ace listen` brings you back. Messages already queued for you stay queued until their TTL.
 
-## Environment Variable Reference
+## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `ACE_IDENTITY_KEY` | Master key (base64), bypasses OS Keystore |
+| `ACE_IDENTITY_KEY` | Master key (base64); takes precedence over the OS keystore |
 | `ACE_RELAY` | Relay URL |
-| `ACE_ALLOW_INSECURE_RELAY` | Set to `1`/`true`/`yes` to allow http:// relay |
-| `ACE_ENV` | Set to `test` for test mode (e.g., localhost HTTPS→HTTP downgrade) |
+| `ACE_ALLOW_INSECURE_RELAY` | `1`/`true`/`yes` allows an http:// relay |

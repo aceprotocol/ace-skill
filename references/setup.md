@@ -1,19 +1,19 @@
 # ACE Seller Setup
 
-Guide a merchant through identity creation, configuration, and going online.
+Guide a merchant through identity creation, profile setup and going online.
 
 ## Prerequisites
 
-- Node.js 22+
-- `ace` command available (ace-cli installed)
+- Node.js 20.19+
+- `ace` command available (`@ace-protocol/cli`)
 
 ## Steps
 
 ### 1. Initialize Identity
 
-Run `ace init` in the merchant's project directory. This generates an Ed25519 signing keypair and an X-Wing (X25519 + ML-KEM-768) encryption key, encrypts them to `~/.ace/identity.enc`, and creates `~/.ace/config.json`.
+`ace init` generates an Ed25519 signing key and a 32-byte X-Wing (X25519 + ML-KEM-768) encryption seed, encrypts both to `~/.ace/identity.enc` (master key in the OS keystore), and writes `~/.ace/config.json` with the relay URL (`ACE_RELAY` or `https://relay.aceprotocol.org`).
 
-You can set the discovery profile at the same time:
+Set the discovery profile at the same time:
 
 ```bash
 ace init \
@@ -21,83 +21,45 @@ ace init \
   --description "Specialty coffee delivered by drone" \
   --tags "coffee,delivery" \
   --chains "eip155:8453" \
-  --endpoint "https://myshop.example.com/ace/receive" \
   --currency USD \
   --max-amount "100.00"
 ```
 
-**All init options:**
-
 | Option | Description |
 |--------|-------------|
-| `--name <name>` | Agent display name |
-| `--description <desc>` | One-line description |
-| `--tags <tags>` | Comma-separated tags |
-| `--chains <chains>` | Comma-separated chain IDs (CAIP-2 format, e.g. `eip155:8453`) |
-| `--endpoint <url>` | HTTPS message endpoint (for P2P direct delivery) |
-| `--currency <code>` | Pricing currency (e.g. USD) |
-| `--max-amount <amount>` | Max price per transaction |
-| `--force` | Reinitialize (destroys old key, requires interactive terminal confirmation) |
+| `--name <name>` | Display name (1–64 characters) |
+| `--description <desc>` | One-line description (max 256 characters) |
+| `--tags <tags>` | Comma-separated tags (max 10, lowercase alphanumeric + hyphen, max 32 characters each) |
+| `--chains <chains>` | Comma-separated CAIP-2 chain IDs, e.g. `eip155:8453` (max 10) |
+| `--endpoint <url>` | HTTPS direct message endpoint (usually set by `ace listen --port --host` instead) |
+| `--currency <code>` | Pricing currency (default `USD` when `--max-amount` is given) |
+| `--max-amount <amount>` | Max price, decimal string like `100.00` |
+| `--force` | Destroy the existing identity and its state and create a new one (interactive terminal only) |
 
-Example output:
+The profile is validated before any key is created. Example output:
+
 ```
 Identity created: ace:sha256:a1b2c3d4...
 Keys stored in ~/.ace/
-⚠ BACKUP: To recover on another machine, you need both:
+
+BACKUP: to recover on another machine you need both:
   1. ~/.ace/identity.enc (encrypted key file)
-  2. Master key from OS keystore. Export it now:
+  2. The master key from the OS keystore. Export it now:
      security find-generic-password -s ace-cli -a master-key -w
+  Restore with: ACE_IDENTITY_KEY="<master-key>" ace register
+
+Next: "ace register" to publish your profile, "ace listen" to receive messages.
 ```
 
-**Back up your master key immediately!** See `key-backup.md` for details.
+**Back up the master key immediately.** See `key-backup.md`.
 
-### 2. Create Merchant Config
+### 2. Keep Your Catalog
 
-Create `ace-merchant.json` in your project directory. This file is edited as JSON directly — there is no CLI command for it.
+The CLI does not read a catalog file. Keep products, prices, wallet addresses and RPC endpoints in your own file (see `catalog-management.md`) and consult it when answering RFQs.
 
-```json
-{
-  "ace": "1.0",
-  "merchant": {
-    "name": "Coffee Shop AI",
-    "description": "Specialty coffee delivered by drone"
-  },
-  "catalog": [
-    {
-      "id": "latte",
-      "name": "Oat Milk Latte",
-      "description": "12oz signature latte with oat milk",
-      "price": "6.50",
-      "currency": "USD",
-      "available": true
-    }
-  ],
-  "settlement": ["crypto/instant"],
-  "chains": [
-    { "network": "eip155:8453", "address": "0xYOUR_WALLET_ADDRESS" }
-  ],
-  "relay": "https://relay.aceprotocol.org",
-  "verification": {
-    "rpc": {
-      "eip155:8453": "https://mainnet.base.org"
-    },
-    "confirmations": 3
-  }
-}
-```
+### 3. Discovery Profile (optional)
 
-**Required field checklist:**
-- `merchant.name` — store name
-- `catalog` — at least one item, each with id, name, price, currency
-- `settlement` — at least one method (currently `["crypto/instant"]`)
-- `chains[].address` — your actual wallet address
-- `verification.rpc` — RPC endpoint for each chain (used for on-chain verification)
-
-If the file exists but has invalid JSON or missing fields, `ace listen` will fail with an explicit error rather than silently ignoring the problem.
-
-### 3. Set Up Discovery Profile (Optional)
-
-If you didn't set a profile during `ace init`, create `~/.ace/profile.json` manually:
+Without profile flags at init, create `~/.ace/profile.json` yourself:
 
 ```json
 {
@@ -105,85 +67,64 @@ If you didn't set a profile during `ace init`, create `~/.ace/profile.json` manu
   "description": "Specialty coffee delivered by drone",
   "tags": ["coffee", "delivery", "drone"],
   "chains": ["eip155:8453"],
-  "endpoint": "https://myshop.example.com/ace/receive",
-  "pricing": {
-    "currency": "USD",
-    "maxAmount": "100.00"
-  }
+  "pricing": { "currency": "USD", "maxAmount": "100.00" }
 }
 ```
 
-This profile is sent to the relay when `ace listen` starts, making you discoverable via `ace discover agents`. All fields are optional.
+All fields are optional. `pricing` may contain only `currency` and `maxAmount`. Publish it with `ace register` (or by starting `ace listen`).
 
-### 4. Start Listening
+### 4. Register and Listen
 
 ```bash
+ace register   # {"aceId":"ace:sha256:...","relay":"https://relay.aceprotocol.org","status":"registered"}
 ace listen
 ```
 
-This will:
-1. Verify identity file integrity
-2. Register identity and profile with the relay
-3. Sync offline messages
-4. Listen for new messages in real time via SSE
+`ace listen`:
+1. Loads and checks the identity.
+2. Registers the identity and profile on the relay (a failure here is logged as non-fatal).
+3. Replays everything queued since its durable cursor (`catchup`), then streams new messages over SSE, reconnecting with backoff.
 
-Keep it running — this is your store's "open for business" sign.
+Keep it running: this is your "open for business" sign. Received messages land in `~/.ace/messages/inbox/unread/`.
 
-**Optional: Enable P2P direct delivery**
-
-```bash
-ace listen --port 3001 --host "myshop.example.com"
-```
-
-This also starts an HTTP server so other agents can deliver messages directly, bypassing the relay for lower latency. `--port` and `--host` must both be provided.
-
-Custom bind address (default `0.0.0.0`):
+**Optional: direct delivery**
 
 ```bash
-ace listen --port 3001 --host "myshop.example.com" --bind "127.0.0.1"
+ace listen --port 3001 --host myshop.example.com
+ace listen --port 3001 --host myshop.example.com --bind 127.0.0.1
 ```
 
-The direct delivery server includes rate limiting: 60 requests/min per IP. Exceeding this returns HTTP 429.
+Starts an HTTP server on `--bind` (default `0.0.0.0`) and publishes `https://<host>:<port>/ace/receive` as your profile `endpoint` while it runs; on shutdown the endpoint is removed from the profile. `--port` and `--host` must be given together. Put a TLS terminator in front of the port: senders only use HTTPS endpoints that resolve to public addresses, and fall back to the relay otherwise. The server answers `GET /ace/health` and is rate-limited to 60 requests/min per IP (HTTP 429).
 
-**Custom relay:**
+**Custom relay**
 
 ```bash
-ace listen --relay "https://custom-relay.example.com"
+ace listen --relay https://relay.example.com
 ```
 
-## Relay URL Resolution Order
+## Relay URL Resolution
 
-`ace listen`, `ace send`, `ace inbox`, and other relay-dependent commands resolve the relay URL in this order:
-
-1. `--relay <url>` command-line flag
+1. `--relay <url>`
 2. `ACE_RELAY` environment variable
-3. `~/.ace/config.json` → `relay` field
-4. `./ace-merchant.json` → `relay` field (listen only)
-5. Error if none found
+3. `~/.ace/config.json` → `relay`
+
+Otherwise: `No relay URL configured`. http:// relays need `--allow-insecure-relay` or `ACE_ALLOW_INSECURE_RELAY=1`.
 
 ## Next Steps
 
-Once `ace listen` is running, buyer agents can discover you via `ace discover agents` and send RFQ messages. See `selling.md` for the full transaction flow.
+Buyers find you via `ace discover agents` and send RFQs. See `selling.md`.
 
-## File Structure Overview
-
-After initialization:
+## File Structure
 
 ```
 ~/.ace/
-├── identity.enc        # AES-256-GCM encrypted keys (Ed25519 signing key + 32-byte X-Wing seed)
-├── config.json         # Base config (relay URL)
+├── identity.enc        # Encrypted keys (Ed25519 signing key + 32-byte X-Wing seed)
+├── config.json         # Relay URL
 ├── profile.json        # Discovery profile (optional)
-├── listen.pid          # Listen process PID (runtime)
-├── relay.url           # Current relay URL (runtime)
-├── sync-cursor.json    # Last sync cursor
-├── seen_messages.json  # Replay detection buffer
-├── peers/              # Peer public key cache (24h TTL)
-├── messages/
-│   ├── inbox/          # Received messages
-│   └── outbox/         # Sent messages
-└── threads/            # Thread state snapshots
-
-cwd/
-└── ace-merchant.json   # Merchant config (catalog, settlement, RPC)
+├── state/              # SDK pipeline state: peers/, threads/, outbox/, deliveries/,
+│                       #   quarantine/, replay.json, cursors.json, locks/ (do not edit)
+└── messages/
+    ├── inbox/unread/   # Received, not yet shown
+    ├── inbox/read/
+    └── outbox/         # Sent messages
 ```

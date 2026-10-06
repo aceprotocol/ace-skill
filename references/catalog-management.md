@@ -1,23 +1,20 @@
 # ACE Catalog Management
 
-Manage the merchant's product catalog and configuration files.
+Manage the merchant's product catalog and discovery profile.
 
-## File Overview
+## Two Files, Two Owners
 
-| File | Location | Purpose |
-|------|----------|---------|
-| `ace-merchant.json` | Project directory (cwd) | Product catalog, settlement chains, RPC verification config |
-| `~/.ace/profile.json` | Home directory | Network discovery profile (name, tags, pricing) |
+| File | Read by | Purpose |
+|------|---------|---------|
+| Your catalog file (for example `./catalog.json`) | You, the agent | Products, prices, settlement wallets, RPC endpoints for payment checks |
+| `~/.ace/profile.json` | The CLI | Public discovery profile published to the relay |
 
-Both files are edited as JSON directly — no CLI commands. Restart `ace listen` after modifying the profile for changes to take effect.
+The CLI never reads your catalog. It only sends what you put in messages. Keep the catalog wherever suits you; the layout below is a recommendation.
 
-## Merchant Config (`ace-merchant.json`)
-
-### Full Structure
+## Catalog File (agent-maintained)
 
 ```json
 {
-  "ace": "1.0",
   "merchant": {
     "name": "Coffee Shop AI",
     "description": "Specialty coffee delivered by drone"
@@ -33,123 +30,79 @@ Both files are edited as JSON directly — no CLI commands. Restart `ace listen`
     }
   ],
   "settlement": ["crypto/instant"],
-  "chains": [
-    { "network": "eip155:8453", "address": "0xYOUR_BASE_WALLET" }
-  ],
-  "relay": "https://relay.aceprotocol.org",
-  "verification": {
-    "rpc": {
-      "eip155:8453": "https://mainnet.base.org"
-    },
-    "confirmations": 3
-  }
+  "wallets": [
+    {
+      "chain": "eip155:8453",
+      "token": "USDC",
+      "tokenAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "recipient": "0xYOUR_BASE_WALLET",
+      "rpc": "https://mainnet.base.org",
+      "confirmations": 3
+    }
+  ]
 }
 ```
 
-### Catalog Item Fields
+| Item field | Purpose |
+|------------|---------|
+| `id` | Short identifier you can mention in `terms` |
+| `name`, `description` | What you sell |
+| `price` | Decimal string; becomes `offer.price` and `invoice.amount` |
+| `currency` | Becomes `offer.currency` and `invoice.currency` |
+| `available` | Set `false` to delist without deleting |
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `id` | string | yes | Unique identifier, appears in message threads |
-| `name` | string | yes | Product name |
-| `description` | string | no | Detailed description |
-| `price` | string | yes | Price (string format, e.g. "6.50") |
-| `currency` | string | yes | Currency code (e.g. "USD") |
-| `available` | boolean | no | Whether available for sale (default true) |
+`wallets` feeds two places: the invoice's `settlementDetails` (`chain`, `token`, `tokenAddress`, `recipient`) and your own on-chain payment check (`rpc`, `confirmations`). Use the same entry for both so you verify exactly what you invoiced.
 
 ### Common Operations
 
-**Add a product** — append to the `catalog` array:
-
-```json
-{
-  "id": "espresso",
-  "name": "Double Espresso",
-  "description": "Two shots of our house blend",
-  "price": "4.00",
-  "currency": "USD",
-  "available": true
-}
-```
-
-**Take a product offline** — set `"available": false` (preserves the record) or remove from the array.
-
-**Update price** — modify the `price` field directly.
-
-**Add a settlement chain** — update both `chains` and `verification.rpc`:
-
-```json
-{
-  "chains": [
-    { "network": "eip155:8453", "address": "0xBASE_WALLET" },
-    { "network": "eip155:1", "address": "0xETH_WALLET" }
-  ],
-  "verification": {
-    "rpc": {
-      "eip155:8453": "https://mainnet.base.org",
-      "eip155:1": "https://eth.llamarpc.com"
-    },
-    "confirmations": 3
-  }
-}
-```
-
-### Validation Errors
-
-`ace listen` validates the config on startup. If the file exists but is malformed or missing required fields, it fails with an explicit error. Common errors:
-
-| Error | Cause |
-|-------|-------|
-| `merchant.name is required` | Missing `merchant.name` |
-| `catalog must have at least one item` | Empty catalog array |
-| `catalog item missing id` | Item missing `id` field |
-| `catalog item "xxx" missing name` | Item missing `name` field |
-| `catalog item "xxx" missing price` | Item missing `price` field |
-| `catalog item "xxx" missing currency` | Item missing `currency` field |
-| `settlement must have at least one method` | Empty settlement array |
+- **Add a product:** append to `catalog`.
+- **Delist:** `"available": false`.
+- **Change a price:** edit `price`. Offers already sent keep their price; only the latest offer in a thread can be accepted.
+- **Add a chain:** add a `wallets` entry with its own RPC endpoint and confirmation count, and add the chain to your profile's `chains`.
 
 ## Discovery Profile (`~/.ace/profile.json`)
 
-Controls how other agents find you via `ace discover agents`. Sent to the relay automatically when `ace listen` starts.
+Controls how others find you via `ace discover agents`. Written by `ace init` profile flags or by hand; published by `ace register` and on every `ace listen` start.
 
 ```json
 {
   "name": "Coffee Shop AI",
   "description": "Specialty coffee delivered by drone",
   "tags": ["coffee", "delivery", "drone"],
+  "capabilities": ["coffee-delivery"],
   "chains": ["eip155:8453"],
-  "endpoint": "https://myshop.example.com/ace/receive",
-  "pricing": {
-    "currency": "USD",
-    "maxAmount": "100.00"
-  }
+  "image": "https://myshop.example.com/logo.png",
+  "pricing": { "currency": "USD", "maxAmount": "100.00" }
 }
 ```
 
-| Field | Description |
-|-------|-------------|
-| `name` | Display name |
-| `description` | One-line description |
-| `tags` | Tag array for search matching |
-| `chains` | Supported chain IDs (CAIP-2) |
-| `endpoint` | P2P direct delivery endpoint (HTTPS) |
-| `pricing.currency` | Pricing currency |
-| `pricing.maxAmount` | Max price per transaction |
+| Field | Rules |
+|-------|-------|
+| `name` | 1–64 characters |
+| `description` | Max 256 characters |
+| `tags` | Max 10; lowercase alphanumeric + hyphen, max 32 characters each |
+| `capabilities` | Max 20; same format as tags |
+| `chains` | Max 10 CAIP-2 IDs |
+| `image` | HTTPS URL |
+| `endpoint` | HTTPS URL for direct delivery; normally set by `ace listen --port --host` |
+| `pricing` | `{ "currency": 1–16 characters, "maxAmount"?: "^[0-9]+(\.[0-9]+)?$" }`; no other keys |
 
-All fields are optional. Restart `ace listen` for updates to take effect.
+All fields are optional. An invalid profile makes `ace register` / `ace listen` fail with the offending field. After editing, run `ace register` (or restart `ace listen`).
 
-To unregister from the discovery network:
+The profile is self-asserted and unverified. Buyers trust only your keys, not your profile claims.
+
+## Unregistering
 
 ```bash
 ace unregister
 ```
 
-Local files (`~/.ace/`) are preserved. Re-run `ace listen` to go online again.
+Removes the identity and profile from the relay; `~/.ace/` is kept. `ace register` or `ace listen` brings you back.
 
 ## Best Practices
 
-- Keep product IDs short and meaningful (they appear in message threads)
-- Use consistent currency across similar products
-- Use `available: false` for temporary delistings instead of deleting
-- Configure a matching RPC endpoint for every chain in `chains`
-- Use specific tags in your profile to help buyers find you via search
+- Keep item IDs short and stable.
+- Use one currency across similar items.
+- Delist with `available: false` instead of deleting.
+- Configure an RPC endpoint and confirmation count for every chain you invoice on.
+- Use specific tags so buyers find you.
