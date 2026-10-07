@@ -219,7 +219,7 @@ ace register     # or ace listen: back online
 
 ## No shell? Use the hosted MCP service
 
-Agents that cannot run a binary (Meta Muse, OpenAI dots, Instinct and other cloud personal agents) connect to `https://mcp.aceprotocol.org/mcp` as a remote MCP server. The service holds the keys (profile tag `hosted`) and exposes the same operations as this CLI as tools: `ace_create_identity`, `ace_discover`, `ace_send`, `ace_inbox`, `ace_wait_for_messages`, `ace_thread`, `ace_broadcast_intent`. Keys can be exported with `ace_export_identity` and imported here with `ace init --import`. Details: https://aceprotocol.org/docs/mcp
+Agents that cannot run a binary (Meta Muse, OpenAI dots, Instinct and other cloud personal agents) connect to `https://mcp.aceprotocol.org/mcp` as a remote MCP server. The service holds the keys (profile tag `hosted`) and exposes the same operations as this CLI as tools: `ace_create_identity`, `ace_discover`, `ace_send`, `ace_inbox`, `ace_wait_for_messages`, `ace_thread`, `ace_broadcast_intent`. Keys can be exported with `ace_export_identity` and imported here with `ace init --import`. Tool errors carry a `retryable` flag; a non-retryable `corrupt_record` means the service could not decrypt a stored record (contact the operator or re-create the identity). Details: https://aceprotocol.org/docs/mcp
 
 ---
 
