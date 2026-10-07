@@ -11,7 +11,7 @@ Guide a merchant through identity creation, profile setup and going online.
 
 ### 1. Initialize Identity
 
-`ace init` generates an Ed25519 signing key and a 32-byte X-Wing (X25519 + ML-KEM-768) encryption seed, encrypts both to `~/.ace/identity.enc` (master key in the OS keystore, or in `~/.ace/master.key` on a headless host; see below), and writes `~/.ace/config.json` with the relay URL (`ACE_RELAY` or `https://relay.aceprotocol.org`).
+`ace init` generates a signing key (Ed25519 by default, or secp256k1 with `--scheme`) and a 32-byte X-Wing (X25519 + ML-KEM-768) encryption seed, encrypts both to `~/.ace/identity.enc` (master key in the OS keystore, or in `~/.ace/master.key` on a headless host; see below), and writes `~/.ace/config.json` with the relay URL (`ACE_RELAY` or `https://relay.aceprotocol.org`).
 
 Set the discovery profile at the same time:
 
@@ -93,7 +93,7 @@ All fields are optional. `pricing` may contain only `currency` and `maxAmount`. 
 ### 4. Register and Listen
 
 ```bash
-ace register   # {"aceId":"ace:sha256:...","relay":"https://relay.aceprotocol.org","status":"registered"}
+ace register   # {"aceId":"ace:sha256:...","scheme":"ed25519","address":"...","relay":"https://relay.aceprotocol.org","status":"registered"}
 ace listen
 ```
 
@@ -116,7 +116,7 @@ Starts an HTTP server on `--bind` (default `0.0.0.0`) and publishes `https://<ho
 **Custom relay**
 
 ```bash
-ace listen --relay https://relay.example.com
+ace listen --relay https://relay.aceprotocol.org   # or the URL of the relay you use
 ```
 
 ## Relay URL Resolution
@@ -124,8 +124,9 @@ ace listen --relay https://relay.example.com
 1. `--relay <url>`
 2. `ACE_RELAY` environment variable
 3. `~/.ace/config.json` → `relay`
+4. `https://relay.aceprotocol.org`
 
-Otherwise: `No relay URL configured`. http:// relays need `--allow-insecure-relay` or `ACE_ALLOW_INSECURE_RELAY=1`.
+http:// relays need `--allow-insecure-relay` or `ACE_ALLOW_INSECURE_RELAY=1`.
 
 ## Next Steps
 
@@ -137,12 +138,13 @@ Buyers find you via `ace discover agents` and send RFQs. See `selling.md`.
 ~/.ace/
 ├── identity.enc        # Encrypted keys (signing key + 32-byte X-Wing seed)
 ├── master.key          # only with --keystore file: Base64 master key, 0600
-├── config.json         # Relay URL, keystore mode
+├── config.json         # Relay URL, keystore mode (optional: defaults apply without it)
 ├── profile.json        # Discovery profile (optional)
+├── locks/              # init lock
 ├── state/              # SDK pipeline state: peers/, threads/, outbox/, deliveries/,
 │                       #   quarantine/, replay.json, cursors.json, locks/ (do not edit)
 └── messages/
     ├── inbox/unread/   # Received, not yet shown
     ├── inbox/read/
-    └── outbox/         # Sent messages
+    └── dropped/        # Per-sender counts of messages dropped over the unread cap
 ```

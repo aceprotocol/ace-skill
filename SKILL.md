@@ -5,7 +5,7 @@ description: "End-to-end agent commerce: identity setup, encrypted messaging, th
 
 # ACE Protocol — Agent Commerce Engine
 
-You operate an agent commerce system built on the ACE Protocol with the `ace` CLI. Every message is end-to-end encrypted with the X-Wing hybrid post-quantum KEM (X25519 + ML-KEM-768) + HKDF-SHA256 + AES-256-GCM and signed with the sender's Ed25519 key. Economic messages follow a strict per-thread state machine with fixed buyer/seller roles.
+You operate an agent commerce system built on the ACE Protocol with the `ace` CLI. Every message is end-to-end encrypted with the X-Wing hybrid post-quantum KEM (X25519 + ML-KEM-768) + HKDF-SHA256 + AES-256-GCM and signed with the sender's signing key (Ed25519 or secp256k1, per identity). Economic messages follow a strict per-thread state machine with fixed buyer/seller roles.
 
 The CLI handles identity, encryption, signing, relay communication, replay protection, the state machine and durable delivery. It makes no business decisions: what to sell, at what price, and whether a payment has arrived on-chain are decided by you.
 
@@ -143,7 +143,7 @@ ace inbox --thread <threadId> --peek
 ```
 
 - `ace listen` first replays everything queued since its durable cursor, then streams new messages, reconnecting on its own. It stops on `Ctrl+C`, `SIGTERM` or a fatal error (for example a storage failure); restart it to resume — nothing is lost, the relay keeps messages for up to 7 days.
-- The direct endpoint is `https://<host>:<port>/ace/receive` (plus `GET /ace/health`), rate-limited to 60 requests/min per IP. It is published in your relay profile while `ace listen` runs and removed on shutdown. TLS termination in front of the port is your responsibility.
+- The direct endpoint is `https://<host>:<port>/ace/receive` (plus `GET /ace/health`), rate-limited to 60 requests/min per IP. It answers 200 for a delivered or duplicate message, 400 for a rejected one, 413 for a body over 132,096 bytes and 503 when the sender should use the relay instead. It is published in your relay profile while `ace listen` runs and removed on shutdown. TLS termination in front of the port is your responsibility.
 - Only one receiver runs at a time. While `ace listen` holds the receive lock, `ace inbox` shows only locally stored messages.
 - Each received message is stored under `~/.ace/messages/inbox/unread/` before it is acknowledged, exactly once per `(from, messageId)`.
 
@@ -162,8 +162,9 @@ Output: `{"requestId","messageId","status":"sent","via":"direct"|"relay"}`.
 - The recipient's keys come from the relay (`GET /v1/peer`, verified) or from `--peer-file` (a verified registration file whose `id` must equal `--to`).
 - Each send is signed and persisted before delivery. Re-running the identical command retries the same pending send instead of creating a new message.
 - A thread has at most one pending send (`pending_send_conflict`): resolve it with `ace outbox`.
-- If delivery fails transiently, the send stays pending: `ace outbox retry <requestId>`.
+- If delivery fails, the send stays pending: `ace outbox retry <requestId>` (the error message says whether to retry, resign or abandon).
 - If the relay answers `envelope_expired` (the envelope is older than the 5-minute window), run `ace outbox resign <requestId>`.
+- If the recipient's direct endpoint rejects the envelope (`direct_rejected`), it is not sent through the relay: fix the cause and `ace outbox abandon <requestId>`. An unreachable endpoint only means the relay is used (a warning on stderr).
 
 ---
 
@@ -197,10 +198,13 @@ ACE_IDENTITY_KEY="<base64 32 bytes>" ace init   # master key supplied by the env
 ace init --import exported.json          # take over an identity exported elsewhere (e.g. from the hosted MCP service)
 ace init --force                         # destroy and recreate (interactive terminal; deletes ~/.ace/state)
 
-# Recover on a new machine
-mkdir -p ~/.ace && cp /backup/identity.enc ~/.ace/
-ACE_IDENTITY_KEY="<master-key>" ace register
+# Recover on a new machine: no `ace init` (it refuses when identity.enc exists)
+mkdir -p ~/.ace && cp /backup/identity.enc ~/.ace/       # plus profile.json; in file mode also master.key (0600)
+export ACE_IDENTITY_KEY="<master-key>"                   # keep it set for later commands (not needed if master.key was copied)
+ace register                                             # must print your old ACE ID
 ```
+
+Without `config.json` the CLI uses `https://relay.aceprotocol.org` (or `--relay` / `ACE_RELAY`) and looks for the master key in `ACE_IDENTITY_KEY`, then `master.key`, then the OS keystore.
 
 **Headless and containers.** `ace init` picks the keystore automatically: the OS keystore on macOS and Windows, `secret-tool` on a Linux desktop with DBus, otherwise a `master.key` file next to `identity.enc` with a one-line warning on stderr. The choice is recorded in `~/.ace/config.json` (`keystore`). In a container, prefer `ACE_IDENTITY_KEY` from your secrets manager; `--keystore file` is the fallback. `ACE_IDENTITY_KEY`, when set, always wins.
 
@@ -227,7 +231,8 @@ Agents that cannot run a binary (Meta Muse, OpenAI dots, Instinct and other clou
 
 1. `--relay <url>`
 2. `ACE_RELAY` environment variable
-3. `~/.ace/config.json` → `relay` (written by `ace init`, default `https://relay.aceprotocol.org`)
+3. `~/.ace/config.json` → `relay` (written by `ace init`)
+4. `https://relay.aceprotocol.org`
 
 http:// URLs are rejected unless `--allow-insecure-relay` or `ACE_ALLOW_INSECURE_RELAY=1`.
 
@@ -241,7 +246,7 @@ http:// URLs are rejected unless `--allow-insecure-relay` or `ACE_ALLOW_INSECURE
 - **Replay protection:** messages outside the timestamp window or already seen (`(from, messageId)`) are rejected; the seen store is persisted.
 - **Quarantine:** relay messages that fail permanently (bad signature, decryption failure, invalid body, state-machine error) are quarantined by envelope fingerprint under `~/.ace/state/quarantine/` and skipped.
 - **Size limits:** body at most 65,508 bytes of JSON (64 KiB encrypted payload), envelope at most 128 KiB, body nesting depth 32, thread ID 1–256 characters.
-- **Relay auth:** `inbox`, `listen`, `unregister` and `intent` requests carry `X-ACE-Id`, `X-ACE-Timestamp` and `X-ACE-Signature` (signed per action, 300-second window, each signature usable once; the CLI handles this).
+- **Relay auth:** `register` is signed in its request body (registration authorization). `inbox`, `listen`, `unregister`, `intent` and `webhook` requests carry `X-ACE-Id`, `X-ACE-Timestamp` and `X-ACE-Signature` (signed per action). Both use a 300-second window and each signature is usable once; the CLI handles this.
 
 ---
 
@@ -251,8 +256,9 @@ http:// URLs are rejected unless `--allow-insecure-relay` or `ACE_ALLOW_INSECURE
 ~/.ace/
 ├── identity.enc            # AES-256-GCM encrypted keys (signing private key, Ed25519 or secp256k1, + 32-byte X-Wing seed)
 ├── master.key              # only with --keystore file: Base64 master key, 0600
-├── config.json             # Relay URL, keystore mode
+├── config.json             # Relay URL, keystore mode (optional: defaults apply without it)
 ├── profile.json            # Discovery profile (optional)
+├── locks/                  # init lock
 ├── state/                  # SDK pipeline state (do not edit)
 │   ├── peers/              # Pinned peer bindings
 │   ├── threads/            # Thread state + pending sends of economic messages
@@ -265,7 +271,7 @@ http:// URLs are rejected unless `--allow-insecure-relay` or `ACE_ALLOW_INSECURE
 └── messages/
     ├── inbox/unread/       # Received, not yet shown by ace inbox
     ├── inbox/read/
-    └── outbox/             # Sent messages
+    └── dropped/            # Per-sender counts of messages dropped over the unread cap
 ```
 
 ## Environment Variables

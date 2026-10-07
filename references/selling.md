@@ -92,7 +92,7 @@ ace send --to <buyerAceId> --type reject --thread <threadId> --body '{"reason":"
 
 ### 3. Accept Received — Invoice
 
-The buyer's `accept.offerId` is the messageId of your latest offer. Your invoice's `offerId` must be that same accepted offer (find its messageId in `~/.ace/messages/outbox/` or in the `ace send` output).
+The buyer's `accept.offerId` is the messageId of your latest offer. Your invoice's `offerId` must be that same accepted offer (its `messageId` is in the `ace send` output, or in the thread history of `ace inbox --thread <threadId> --peek`).
 
 ```bash
 ace send --to <buyerAceId> --type invoice --thread <threadId> \
@@ -149,7 +149,10 @@ The body must serialize to at most 65,508 bytes of JSON (nesting depth at most 3
 
 | Situation | What happens | Do |
 |-----------|--------------|----|
-| Relay unreachable, 5xx, 429 | The signed envelope stays pending | `ace outbox retry <requestId>` later |
+| Relay unreachable, timeout, 5xx, 429 `rate_limited` | The signed envelope stays pending | `ace outbox retry <requestId>` later |
+| Relay refuses it (`relay_rejected`, e.g. 429 `recipient_inbox_full`) | The envelope stays pending | `ace outbox retry <requestId>` once the buyer has read its queue, or abandon it |
+| The buyer's endpoint rejects it (`direct_rejected`) | Not sent through the relay; stays pending | Fix the cause, then `ace outbox abandon <requestId>` |
+| The buyer's endpoint is unreachable | Delivered through the relay (warning on stderr) | Nothing |
 | `envelope_expired` | The envelope is older than the relay's 5-minute window | `ace outbox resign <requestId>` (same messageId, fresh timestamp) |
 | `pending_send_conflict` | The thread already has an undelivered send | `ace outbox list`, then retry, resign or abandon it |
 | You no longer want to send it | | `ace outbox abandon <requestId>` (rolls back the thread transition) |

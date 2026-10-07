@@ -34,7 +34,7 @@ ACE has no forward secrecy against recipient-key compromise. Losing the seed mak
 
 ## Keystore Modes
 
-`ace init --keystore <auto|os|file|env>` (or env `ACE_KEYSTORE`, the flag wins) decides where the master key lives; it is recorded in `~/.ace/config.json` as `keystore`. `auto` picks `env` when `ACE_IDENTITY_KEY` is set, else the OS keystore on macOS and Windows and on Linux when `secret-tool` is on PATH and `DBUS_SESSION_BUS_ADDRESS` is set, else `file`. `ACE_IDENTITY_KEY`, when set, always wins at load time.
+`ace init --keystore <auto|os|file|env>` (or env `ACE_KEYSTORE`, the flag wins) decides where the master key lives; it is recorded in `~/.ace/config.json` as `keystore` (without `config.json`, see Recovery below). `auto` picks `env` when `ACE_IDENTITY_KEY` is set, else the OS keystore on macOS and Windows and on Linux when `secret-tool` is on PATH and `DBUS_SESSION_BUS_ADDRESS` is set, else `file`. `ACE_IDENTITY_KEY`, when set, always wins at load time.
 
 | Mode | Master key lives in | What to back up |
 |------|---------------------|-----------------|
@@ -76,20 +76,35 @@ Output is a base64-encoded 32-byte key.
 - Record the master-key value in a secure location (password manager, encrypted notes, etc.)
 - Both must be saved together — `identity.enc` alone is unusable
 
+## What to Back Up
+
+| File | Needed | Why |
+|------|--------|-----|
+| `~/.ace/identity.enc` + the master key | Required | The identity itself; one is useless without the other |
+| `~/.ace/profile.json` | Recommended | Your discovery profile; without it `ace register` publishes none |
+| `~/.ace/config.json` | Optional | Relay URL and keystore mode; without it the defaults apply (below) |
+| `~/.ace/state/`, `~/.ace/messages/` | Optional | Open threads, pinned peers, cursor, message history |
+
 ## Recovery on a New Machine
 
-```bash
-# 1. Create directory and copy key file
-mkdir -p ~/.ace && cp /backup/identity.enc ~/.ace/
+No `ace init`: it refuses when `identity.enc` exists, and a restored identity needs none.
 
-# 2. Provide master-key via environment variable
+```bash
+# 1. Create directory and copy the key file (and profile.json, if backed up)
+mkdir -p ~/.ace && cp /backup/identity.enc /backup/profile.json ~/.ace/
+
+# 2. Provide the master key via the environment (keep it set for later commands)
 export ACE_IDENTITY_KEY="<exported master-key value>"
 
 # 3. Verify the identity loads and re-register it on the relay
 ace register
 ```
 
-`ace register` prints your ACE ID, which must equal the old one. Pipeline state (`~/.ace/state/`: pinned peers, threads, replay store, cursor) and message history (`~/.ace/messages/`) are not part of the key backup. Copy them too to resume open threads; without them, `ace listen` starts with an empty state and receives every message still queued on the relay (up to 7 days).
+`ace register` prints your ACE ID, which must equal the old one. In `file` mode you may instead copy `master.key` next to `identity.enc` (mode 0600) and skip step 2.
+
+Without `config.json`, commands use the relay from `--relay`, then `ACE_RELAY`, then `https://relay.aceprotocol.org`, and look for the master key in `ACE_IDENTITY_KEY`, then `~/.ace/master.key`, then the OS keystore.
+
+Pipeline state (`~/.ace/state/`: pinned peers, threads, replay store, cursor) and message history (`~/.ace/messages/`) are not part of the key backup. Copy them too to resume open threads; without them, `ace listen` starts with an empty state and receives every message still queued on the relay (up to 7 days).
 
 ## Importing an Exported Identity
 
