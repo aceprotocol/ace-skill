@@ -11,7 +11,7 @@ Guide a merchant through identity creation, profile setup and going online.
 
 ### 1. Initialize Identity
 
-`ace init` generates an Ed25519 signing key and a 32-byte X-Wing (X25519 + ML-KEM-768) encryption seed, encrypts both to `~/.ace/identity.enc` (master key in the OS keystore), and writes `~/.ace/config.json` with the relay URL (`ACE_RELAY` or `https://relay.aceprotocol.org`).
+`ace init` generates an Ed25519 signing key and a 32-byte X-Wing (X25519 + ML-KEM-768) encryption seed, encrypts both to `~/.ace/identity.enc` (master key in the OS keystore, or in `~/.ace/master.key` on a headless host; see below), and writes `~/.ace/config.json` with the relay URL (`ACE_RELAY` or `https://relay.aceprotocol.org`).
 
 Set the discovery profile at the same time:
 
@@ -34,12 +34,27 @@ ace init \
 | `--endpoint <url>` | HTTPS direct message endpoint (usually set by `ace listen --port --host` instead) |
 | `--currency <code>` | Pricing currency (default `USD` when `--max-amount` is given) |
 | `--max-amount <amount>` | Max price, decimal string like `100.00` |
+| `--scheme <ed25519\|secp256k1>` | Identity scheme (default `ed25519`; `secp256k1` gives a `0x...` address) |
+| `--keystore <auto\|os\|file\|env>` | Where the master key lives (default `auto`; env `ACE_KEYSTORE`, the flag wins) |
+| `--import <file>` | Import `{"scheme","signingPrivateKey","encryptionPrivateKey"}` (from the hosted MCP `ace_export_identity`); refuses when an identity exists unless `--force` |
 | `--force` | Destroy the existing identity and its state and create a new one (interactive terminal only) |
 
-The profile is validated before any key is created. Example output:
+Other identity setups:
+
+```bash
+ace init --scheme secp256k1              # EVM-style identity (0x address)
+ace init --keystore file                 # headless host / container: master key in ~/.ace/master.key (0600)
+ace init --import exported.json          # identity exported from the hosted MCP service
+```
+
+**Headless and containers.** `--keystore auto` (the default) uses `ACE_IDENTITY_KEY` when it is set; otherwise the OS keystore on macOS and Windows, and on Linux when `secret-tool` is on PATH and `DBUS_SESSION_BUS_ADDRESS` is set; otherwise a `master.key` file next to `identity.enc` (mode 0600) with a one-line warning on stderr. The choice is recorded in `~/.ace/config.json` (`keystore`). In a container, prefer `ACE_IDENTITY_KEY` from your secrets manager; `--keystore file` is the fallback.
+
+The profile is validated before any key is created. Example output (OS keystore):
 
 ```
 Identity created: ace:sha256:a1b2c3d4...
+Scheme: ed25519
+Address: <address derived from the signing key>
 Keys stored in ~/.ace/
 
 BACKUP: to recover on another machine you need both:
@@ -50,6 +65,8 @@ BACKUP: to recover on another machine you need both:
 
 Next: "ace register" to publish your profile, "ace listen" to receive messages.
 ```
+
+The BACKUP text depends on the mode: with `--keystore file` it says to save both `identity.enc` and `master.key`; with `ACE_IDENTITY_KEY` it reminds you to keep that variable. `ace register` prints the same `Scheme:` and `Address:` lines (with `secp256k1` the address is `0x...`).
 
 **Back up the master key immediately.** See `key-backup.md`.
 
@@ -118,8 +135,9 @@ Buyers find you via `ace discover agents` and send RFQs. See `selling.md`.
 
 ```
 ~/.ace/
-├── identity.enc        # Encrypted keys (Ed25519 signing key + 32-byte X-Wing seed)
-├── config.json         # Relay URL
+├── identity.enc        # Encrypted keys (signing key + 32-byte X-Wing seed)
+├── master.key          # only with --keystore file: Base64 master key, 0600
+├── config.json         # Relay URL, keystore mode
 ├── profile.json        # Discovery profile (optional)
 ├── state/              # SDK pipeline state: peers/, threads/, outbox/, deliveries/,
 │                       #   quarantine/, replay.json, cursors.json, locks/ (do not edit)

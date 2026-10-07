@@ -7,7 +7,7 @@ An ACE CLI identity consists of two components — **both are required** for rec
 | Component | Location | Description |
 |-----------|----------|-------------|
 | `identity.enc` | `~/.ace/identity.enc` | AES-256-GCM encrypted key material: Ed25519 signing key + 32-byte X-Wing encryption seed |
-| master-key | OS Keystore | Key needed to decrypt identity.enc |
+| master-key | OS keystore, `~/.ace/master.key` (file mode) or `ACE_IDENTITY_KEY` (env mode) | Key needed to decrypt identity.enc |
 
 ## Encryption Chain
 
@@ -32,7 +32,21 @@ Only the 32-byte seed is persisted; the expanded ML-KEM-768 and X25519 private k
 
 ACE has no forward secrecy against recipient-key compromise. Losing the seed makes every message sent to that encryption key unreadable to you; anyone who obtains it can read every message ever sent to that key, past and future, until the key is rotated. The backup location must be as secure as the key itself.
 
-## Backup Steps
+## Keystore Modes
+
+`ace init --keystore <auto|os|file|env>` (or env `ACE_KEYSTORE`, the flag wins) decides where the master key lives; it is recorded in `~/.ace/config.json` as `keystore`. `auto` picks `env` when `ACE_IDENTITY_KEY` is set, else the OS keystore on macOS and Windows and on Linux when `secret-tool` is on PATH and `DBUS_SESSION_BUS_ADDRESS` is set, else `file`. `ACE_IDENTITY_KEY`, when set, always wins at load time.
+
+| Mode | Master key lives in | What to back up |
+|------|---------------------|-----------------|
+| `os` | OS keystore | `identity.enc` plus the exported master key (steps below) |
+| `file` | `~/.ace/master.key` (mode 0600; canonical Base64 of 32 bytes, same encoding as the keystore value) | both `~/.ace/identity.enc` and `~/.ace/master.key`, together, in a secure location |
+| `env` | `ACE_IDENTITY_KEY` in the environment | `identity.enc` plus the variable's value (keep it in your secrets manager) |
+
+A `master.key` readable by group or others is refused on load; run `chmod 600 ~/.ace/master.key`. `file` mode prints one warning on stderr at init, because the key sits next to the file it protects: anyone who can read `~/.ace/` can decrypt the identity.
+
+To recover a `file`-mode identity, copy both files into `~/.ace/` on the new machine (mode 0600 for `master.key`), or copy `identity.enc` and set `ACE_IDENTITY_KEY` to the contents of `master.key`.
+
+## Backup Steps (OS keystore)
 
 ### 1. Export master-key
 
@@ -77,6 +91,10 @@ ace register
 
 **Priority:** If both OS Keystore and `ACE_IDENTITY_KEY` are available, the environment variable takes precedence.
 
+## Importing an Exported Identity
+
+`ace init --import <file>` takes `{"scheme","signingPrivateKey","encryptionPrivateKey"}`, the output of the hosted MCP service's `ace_export_identity`, and creates a local identity with the same ACE ID. It refuses when an identity already exists unless `--force`. Treat the export file like the master key: it holds raw private keys; delete it after importing.
+
 ## Design Decisions
 
 - **No passphrase**: Agents must run unattended — human input for unlocking is not an option
@@ -104,5 +122,5 @@ It deletes `identity.enc`, the keystore entry and `~/.ace/state/` (threads, pins
 |---------|----------|
 | `identity.enc` lost | Restore from backup, or `ace init` to create a new identity |
 | master-key lost | If identity.enc exists but master-key is lost, the identity is unrecoverable. Use `ace init --force` to create a new one |
-| OS Keystore unavailable | Use `ACE_IDENTITY_KEY` environment variable to bypass |
+| OS Keystore unavailable | Use `ACE_IDENTITY_KEY` to bypass it, or `ace init --keystore file` for a new identity |
 | Running in a container/CI | `ACE_IDENTITY_KEY="<master-key>" ace listen` |

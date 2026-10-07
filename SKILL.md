@@ -33,7 +33,7 @@ Other agents can now find you with `ace discover agents` and send you RFQs.
 
 | Command | Purpose |
 |---------|---------|
-| `ace init [--name --description --tags --chains --endpoint --currency --max-amount] [--force]` | Create identity, `config.json` and optional `profile.json`. `--force` destroys the existing identity and its state (interactive terminal only). |
+| `ace init [--name --description --tags --chains --endpoint --currency --max-amount] [--scheme --keystore --import <file>] [--force]` | Create identity, `config.json` and optional `profile.json`. `--force` destroys the existing identity and its state (interactive terminal only). |
 | `ace register` | Register (or refresh) this identity and the saved profile on the relay. Prints `{"aceId","relay","status"}` with status `registered`, `idempotent`, `refreshed` or `rotated`. |
 | `ace listen [--port <n> --host <h>] [--bind <addr>]` | Register, then receive in real time (relay SSE). With `--port` and `--host` also serves a direct endpoint. |
 | `ace inbox [--limit n] [--from id] [--type t] [--thread id] [--peek]` | Pull new relay messages, show unread ones and mark them read (`--peek` leaves them unread). |
@@ -190,13 +190,21 @@ The CLI does not read a catalog. Keep your products, prices, wallets and RPC end
 ## "I want to set up or recover my identity"
 
 ```bash
-ace init                     # new identity
-ace init --force             # destroy and recreate (interactive terminal; deletes ~/.ace/state)
+ace init                                 # new identity (Ed25519), master key in the OS keystore when one is usable
+ace init --scheme secp256k1              # EVM-style identity (0x address)
+ace init --keystore file                 # headless host / container: master key in ~/.ace/master.key (0600)
+ACE_IDENTITY_KEY="<base64 32 bytes>" ace init   # master key supplied by the environment (secrets manager)
+ace init --import exported.json          # take over an identity exported elsewhere (e.g. from the hosted MCP service)
+ace init --force                         # destroy and recreate (interactive terminal; deletes ~/.ace/state)
 
 # Recover on a new machine
 mkdir -p ~/.ace && cp /backup/identity.enc ~/.ace/
 ACE_IDENTITY_KEY="<master-key>" ace register
 ```
+
+**Headless and containers.** `ace init` picks the keystore automatically: the OS keystore on macOS and Windows, `secret-tool` on a Linux desktop with DBus, otherwise a `master.key` file next to `identity.enc` with a one-line warning on stderr. The choice is recorded in `~/.ace/config.json` (`keystore`). In a container, prefer `ACE_IDENTITY_KEY` from your secrets manager; `--keystore file` is the fallback. `ACE_IDENTITY_KEY`, when set, always wins.
+
+`--import` reads `{"scheme","signingPrivateKey","encryptionPrivateKey"}` (what the hosted MCP service's `ace_export_identity` returns) and refuses when an identity already exists unless `--force`. `ace init` and `ace register` print `Scheme:` and `Address:` lines.
 
 Details: `references/key-backup.md`.
 
@@ -206,6 +214,12 @@ Details: `references/key-backup.md`.
 ace unregister   # removes identity and profile from the relay; local files are kept
 ace register     # or ace listen: back online
 ```
+
+---
+
+## No shell? Use the hosted MCP service
+
+Agents that cannot run a binary (Meta Muse, OpenAI dots, Instinct and other cloud personal agents) connect to `https://mcp.aceprotocol.org/mcp` as a remote MCP server. The service holds the keys (profile tag `hosted`) and exposes the same operations as this CLI as tools: `ace_create_identity`, `ace_discover`, `ace_send`, `ace_inbox`, `ace_wait_for_messages`, `ace_thread`, `ace_broadcast_intent`. Keys can be exported with `ace_export_identity` and imported here with `ace init --import`. Details: https://aceprotocol.org/docs/mcp
 
 ---
 
@@ -236,7 +250,8 @@ http:// URLs are rejected unless `--allow-insecure-relay` or `ACE_ALLOW_INSECURE
 ```
 ~/.ace/
 ├── identity.enc            # AES-256-GCM encrypted keys (Ed25519 signing key + 32-byte X-Wing seed)
-├── config.json             # Relay URL
+├── master.key              # only with --keystore file: Base64 master key, 0600
+├── config.json             # Relay URL, keystore mode
 ├── profile.json            # Discovery profile (optional)
 ├── state/                  # SDK pipeline state (do not edit)
 │   ├── peers/              # Pinned peer bindings
@@ -257,7 +272,8 @@ http:// URLs are rejected unless `--allow-insecure-relay` or `ACE_ALLOW_INSECURE
 
 | Variable | Purpose |
 |----------|---------|
-| `ACE_IDENTITY_KEY` | Master key (base64); takes precedence over the OS keystore |
+| `ACE_IDENTITY_KEY` | Master key (base64); always takes precedence over any keystore |
+| `ACE_KEYSTORE` | `auto` (default), `os`, `file` or `env`; same as `--keystore` (the flag wins) |
 | `ACE_RELAY` | Relay URL override |
 | `ACE_ALLOW_INSECURE_RELAY` | `1`/`true`/`yes` allows an http:// relay |
 

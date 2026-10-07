@@ -17,8 +17,13 @@ ls ~/.ace/state/quarantine | wc -l         # rejected relay messages
 |-------|-----|
 | `identity.enc not found — run "ace init"` | Run `ace init`, or restore a backup (`key-backup.md`) |
 | `OS keychain master key not found for service "ace-cli"` | Set `ACE_IDENTITY_KEY` to the backed-up master key |
+| `master key not found in ~/.ace/master.key` (full text: `ACE master key not found in <path> for service "ace-cli"`) | File mode: `master.key` is missing. Restore it from backup, or set `ACE_IDENTITY_KEY` to the backed-up master key |
+| `<path> is accessible to other users; set its mode to 0600 (chmod 600 "<path>")` | `master.key` is accessible to group/others and refused: run `chmod 600 ~/.ace/master.key` |
+| `keystore mode "env" requires ACE_IDENTITY_KEY to be set` | `--keystore env` / `ACE_KEYSTORE=env` without the variable: export `ACE_IDENTITY_KEY` (Base64 of 32 bytes) or choose another mode |
+| `ACE_KEYSTORE / --keystore must be one of auto, os, file, env` | Invalid mode value: use one of the four |
+| `secret-tool` not found, or no DBus session (Linux) | `auto` then falls back to `file`. To use the OS keystore install `libsecret-tools` and run under a DBus session; otherwise use `--keystore file` or `ACE_IDENTITY_KEY` |
 | `identity.enc corrupted — decryption failed` | Wrong master key or tampered file: restore both from backup |
-| `Identity already exists` | Use the existing identity, or `ace init --force` in an interactive terminal (destroys it) |
+| `Identity already exists` (also from `ace init --import`) | Use the existing identity, or `ace init --force` in an interactive terminal (destroys it) |
 | `Another "ace init" is in progress` | Wait; a lock left by a crashed init is recovered automatically |
 
 ## 2. Send Failures
@@ -115,6 +120,7 @@ Local files are kept. `ace register` or `ace listen` brings you back. Messages a
 
 | Variable | Description |
 |----------|-------------|
-| `ACE_IDENTITY_KEY` | Master key (base64); takes precedence over the OS keystore |
+| `ACE_IDENTITY_KEY` | Master key (base64); always takes precedence over any keystore |
+| `ACE_KEYSTORE` | `auto` (default), `os`, `file` or `env` |
 | `ACE_RELAY` | Relay URL |
 | `ACE_ALLOW_INSECURE_RELAY` | `1`/`true`/`yes` allows an http:// relay |
