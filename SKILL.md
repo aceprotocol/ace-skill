@@ -14,7 +14,7 @@ The CLI handles identity, encryption, signing, relay communication, replay prote
 ## Get Started (60 seconds)
 
 ```bash
-# 1. Create identity (Ed25519 signing key + X-Wing encryption seed, encrypted to ~/.ace/identity.enc)
+# 1. Create identity (signing key, Ed25519 or secp256k1, + X-Wing encryption seed, encrypted to ~/.ace/identity.enc)
 #    and an optional discovery profile (~/.ace/profile.json)
 ace init --name "Coffee Shop AI" --description "Specialty coffee" \
   --tags "coffee,delivery" --chains "eip155:8453" --currency USD --max-amount "100.00"
@@ -34,7 +34,7 @@ Other agents can now find you with `ace discover agents` and send you RFQs.
 | Command | Purpose |
 |---------|---------|
 | `ace init [--name --description --tags --chains --endpoint --currency --max-amount] [--scheme --keystore --import <file>] [--force]` | Create identity, `config.json` and optional `profile.json`. `--force` destroys the existing identity and its state (interactive terminal only). |
-| `ace register` | Register (or refresh) this identity and the saved profile on the relay. Prints `{"aceId","relay","status"}` with status `registered`, `idempotent`, `refreshed` or `rotated`. |
+| `ace register` | Register (or refresh) this identity and the saved profile on the relay. Prints one JSON line `{"aceId","scheme","address","relay","status"}` with status `registered`, `idempotent`, `refreshed` or `rotated`. |
 | `ace listen [--port <n> --host <h>] [--bind <addr>]` | Register, then receive in real time (relay SSE). With `--port` and `--host` also serves a direct endpoint. |
 | `ace inbox [--limit n] [--from id] [--type t] [--thread id] [--peek]` | Pull new relay messages, show unread ones and mark them read (`--peek` leaves them unread). |
 | `ace send --to <aceId> --type <t> --body <json> [--thread id] [--peer-file path]` | Encrypt, sign, stage durably and deliver (direct endpoint first, relay fallback). |
@@ -204,7 +204,7 @@ ACE_IDENTITY_KEY="<master-key>" ace register
 
 **Headless and containers.** `ace init` picks the keystore automatically: the OS keystore on macOS and Windows, `secret-tool` on a Linux desktop with DBus, otherwise a `master.key` file next to `identity.enc` with a one-line warning on stderr. The choice is recorded in `~/.ace/config.json` (`keystore`). In a container, prefer `ACE_IDENTITY_KEY` from your secrets manager; `--keystore file` is the fallback. `ACE_IDENTITY_KEY`, when set, always wins.
 
-`--import` reads `{"scheme","signingPrivateKey","encryptionPrivateKey"}` (what the hosted MCP service's `ace_export_identity` returns) and refuses when an identity already exists unless `--force`. `ace init` and `ace register` print `Scheme:` and `Address:` lines.
+`--import` reads `{"scheme","signingPrivateKey","encryptionPrivateKey"}` (what the hosted MCP service's `ace_export_identity` returns) and refuses when an identity already exists unless `--force`. `ace init` prints `Scheme:` and `Address:` lines; `ace register`'s JSON includes `scheme` and `address`.
 
 Details: `references/key-backup.md`.
 
@@ -249,7 +249,7 @@ http:// URLs are rejected unless `--allow-insecure-relay` or `ACE_ALLOW_INSECURE
 
 ```
 ~/.ace/
-├── identity.enc            # AES-256-GCM encrypted keys (Ed25519 signing key + 32-byte X-Wing seed)
+├── identity.enc            # AES-256-GCM encrypted keys (signing private key, Ed25519 or secp256k1, + 32-byte X-Wing seed)
 ├── master.key              # only with --keystore file: Base64 master key, 0600
 ├── config.json             # Relay URL, keystore mode
 ├── profile.json            # Discovery profile (optional)

@@ -54,7 +54,7 @@ The profile is validated before any key is created. Example output (OS keystore)
 ```
 Identity created: ace:sha256:a1b2c3d4...
 Scheme: ed25519
-Address: <address derived from the signing key>
+Address: 9Wq3xK7m...vR2fTn8L
 Keys stored in ~/.ace/
 
 BACKUP: to recover on another machine you need both:
@@ -66,7 +66,7 @@ BACKUP: to recover on another machine you need both:
 Next: "ace register" to publish your profile, "ace listen" to receive messages.
 ```
 
-The BACKUP text depends on the mode: with `--keystore file` it says to save both `identity.enc` and `master.key`; with `ACE_IDENTITY_KEY` it reminds you to keep that variable. `ace register` prints the same `Scheme:` and `Address:` lines (with `secp256k1` the address is `0x...`).
+The BACKUP text depends on the mode: with `--keystore file` it says to save both `identity.enc` and `master.key`; with `ACE_IDENTITY_KEY` it reminds you to keep that variable. The Ed25519 address is the Base58 encoding of the signing public key (about 43–44 characters, abbreviated above); with `--scheme secp256k1` it is an `0x...` address. `ace register` prints one JSON line whose `scheme` and `address` fields carry the same values.
 
 **Back up the master key immediately.** See `key-backup.md`.
 

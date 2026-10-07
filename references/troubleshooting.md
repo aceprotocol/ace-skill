@@ -16,8 +16,8 @@ ls ~/.ace/state/quarantine | wc -l         # rejected relay messages
 | Error | Fix |
 |-------|-----|
 | `identity.enc not found — run "ace init"` | Run `ace init`, or restore a backup (`key-backup.md`) |
-| `OS keychain master key not found for service "ace-cli"` | Set `ACE_IDENTITY_KEY` to the backed-up master key |
-| `master key not found in ~/.ace/master.key` (full text: `ACE master key not found in <path> for service "ace-cli"`) | File mode: `master.key` is missing. Restore it from backup, or set `ACE_IDENTITY_KEY` to the backed-up master key |
+| `master key not found in OS keystore for service "ace-cli"` | OS mode: the keystore entry is gone. Set `ACE_IDENTITY_KEY` to the backed-up master key |
+| `master key not found in ~/.ace/master.key` (full text from any command: `Identity error: master key not found in <path> for service "ace-cli". Identity cannot be decrypted. If you have a backup of ~/.ace/, the master key must also be restored (or passed as ACE_IDENTITY_KEY).`) | File mode: `master.key` is missing. Restore it from backup, or set `ACE_IDENTITY_KEY` to the backed-up master key |
 | `<path> is accessible to other users; set its mode to 0600 (chmod 600 "<path>")` | `master.key` is accessible to group/others and refused: run `chmod 600 ~/.ace/master.key` |
 | `keystore mode "env" requires ACE_IDENTITY_KEY to be set` | `--keystore env` / `ACE_KEYSTORE=env` without the variable: export `ACE_IDENTITY_KEY` (Base64 of 32 bytes) or choose another mode |
 | `ACE_KEYSTORE / --keystore must be one of auto, os, file, env` | Invalid mode value: use one of the four |

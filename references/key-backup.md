@@ -6,13 +6,13 @@ An ACE CLI identity consists of two components — **both are required** for rec
 
 | Component | Location | Description |
 |-----------|----------|-------------|
-| `identity.enc` | `~/.ace/identity.enc` | AES-256-GCM encrypted key material: Ed25519 signing key + 32-byte X-Wing encryption seed |
+| `identity.enc` | `~/.ace/identity.enc` | AES-256-GCM encrypted key material: signing private key (Ed25519 or secp256k1) + 32-byte X-Wing encryption seed |
 | master-key | OS keystore, `~/.ace/master.key` (file mode) or `ACE_IDENTITY_KEY` (env mode) | Key needed to decrypt identity.enc |
 
 ## Encryption Chain
 
 ```
-randomBytes(32) → stored in OS Keystore (master-key)
+randomBytes(32) → stored in the keystore of the chosen mode (OS keystore, master.key file, or ACE_IDENTITY_KEY)
        ↓
 scrypt(master-key, salt, N=131072, r=8, p=1) → 32-byte AES key
        ↓
@@ -25,7 +25,7 @@ Scrypt parameters follow OWASP recommendations (N=131072, r=8, p=1), balancing s
 
 | Key | Stored form | Derived / published form |
 |-----|-------------|--------------------------|
-| Signing key | Ed25519 private key | 32-byte public key → ACE ID (`ace:sha256:...`) |
+| Signing key | signing private key (Ed25519 or secp256k1) | public key → ACE ID (`ace:sha256:...`) and address (Base58 for Ed25519, `0x...` for secp256k1) |
 | Encryption key | 32-byte X-Wing seed | 1216-byte X-Wing (X25519 + ML-KEM-768) public key, published as `signing.encryptionPublicKey` |
 
 Only the 32-byte seed is persisted; the expanded ML-KEM-768 and X25519 private keys are derived from it in memory and never written to disk. Incoming messages carry a 1120-byte `kemCiphertext` that is decapsulated with this seed.
@@ -43,6 +43,12 @@ ACE has no forward secrecy against recipient-key compromise. Losing the seed mak
 | `env` | `ACE_IDENTITY_KEY` in the environment | `identity.enc` plus the variable's value (keep it in your secrets manager) |
 
 A `master.key` readable by group or others is refused on load; run `chmod 600 ~/.ace/master.key`. `file` mode prints one warning on stderr at init, because the key sits next to the file it protects: anyone who can read `~/.ace/` can decrypt the identity.
+
+### `ACE_IDENTITY_KEY` in every mode
+
+`ACE_IDENTITY_KEY` bypasses whatever store the recorded mode names (OS keystore or `master.key`) and is used directly for decryption: if both are available, the environment variable takes precedence.
+
+**Security behavior:** on first use, `ACE_IDENTITY_KEY` is moved out of `process.env` into process memory, so child processes do not inherit it.
 
 To recover a `file`-mode identity, copy both files into `~/.ace/` on the new machine (mode 0600 for `master.key`), or copy `identity.enc` and set `ACE_IDENTITY_KEY` to the contents of `master.key`.
 
@@ -84,12 +90,6 @@ ace register
 ```
 
 `ace register` prints your ACE ID, which must equal the old one. Pipeline state (`~/.ace/state/`: pinned peers, threads, replay store, cursor) and message history (`~/.ace/messages/`) are not part of the key backup. Copy them too to resume open threads; without them, `ace listen` starts with an empty state and receives every message still queued on the relay (up to 7 days).
-
-`ACE_IDENTITY_KEY` bypasses the OS Keystore and is used directly for decryption.
-
-**Security behavior:** on first use, `ACE_IDENTITY_KEY` is moved out of `process.env` into process memory, so child processes do not inherit it.
-
-**Priority:** If both OS Keystore and `ACE_IDENTITY_KEY` are available, the environment variable takes precedence.
 
 ## Importing an Exported Identity
 
