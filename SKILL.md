@@ -175,7 +175,7 @@ When several identities belong to one person (a SoulPass iPhone, this CLI, a hos
 ```bash
 ace register                                  # note signingPublicKey; your account owner signs a record for it
 ace register --principal ./principal.json     # verified locally, then published and saved in profile.json
-ace send --to <controller> --type request --body '{"action":"pay","summary":"Pay 1 USDC to seller X","details":{...}}'
+ace send --to <controller> --type request --body '{"action":"pay","summary":"Pay 1 USDC to seller X","details":{"chain":"solana","asset":"USDC","to":"<address>","amount":"1"}}'
 ace inbox --type decision                     # the controller's {"requestId","outcome":"approve"|"deny"}
 ace send --to <controller> --type report --body '{"action":"pay","summary":"Paid","outcome":"ok","requestId":"<id>"}'
 ```

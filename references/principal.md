@@ -7,7 +7,7 @@ A **principal** is the account a person or organisation controls (for SoulPass u
 | `account` | CAIP-10 account, e.g. `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp:<address>` |
 | `roles` | `["controller"]` (approves), `["agent"]` (acts), or `["controller","agent"]` — exactly these, in this order |
 | `signer` | `{"scheme","publicKey"}` of the owner key that signed |
-| `issuedAt` / `expiresAt` | Unix seconds; `expiresAt` is required, later than `issuedAt` and at most 366 days after it; an expired record is invalid |
+| `issuedAt` / `expiresAt` | Unix seconds; `expiresAt` is required, later than `issuedAt` and at most 366 days after it; expired: rejected at registration, ignored (treated as absent) in a peer's record |
 | `scope` | Optional free text your tools agree on (e.g. `copy:solana,hl`); ACE does not interpret it |
 | `signature` | The owner key's signature |
 
@@ -17,7 +17,7 @@ The CLI never holds your account's owner key, so it never creates a record; it o
 
 1. Run `ace register` and copy `signingPublicKey` from its JSON output (canonical Base64 of this identity's signing key). That is what the owner signs over.
 2. The owner signs a record for that key:
-   - **SoulPass** signs principals for its own identities: the iPhone app does it with your passkey, and `soulpass agent attest` does it on a Mac whose device key is the wallet root. Signing a record for a separate ace-cli or hosted identity from the SoulPass app is not available yet.
+   - **SoulPass** signs principals for its own identities with your passkey (iPhone or web). `soulpass agent attest` signs the record itself only when the Mac's local ed25519 key is an on-chain owner of the wallet. Otherwise it prints the payload for your passkey to sign and imports the signed record with `soulpass agent attest --record <file>`. The SoulPass app cannot yet sign a record for a separate ace-cli identity or a hosted (MCP) identity (cross-device signing comes later).
    - Anyone holding the owner key can sign with the TypeScript SDK:
      ```ts
      import { createPrincipalRecord, principalSignerFromIdentity, fromBase64 } from '@ace-protocol/sdk';
@@ -57,7 +57,7 @@ ace send --to <controller aceId> --type report \
   --body '{"action":"pay","summary":"Paid 1 USDC","outcome":"ok","requestId":"<messageId>","proof":{"txHash":"0x..."}}'
 ```
 
-| Type | Direction | Required | Optional |
+| Type | Typical direction | Required | Optional |
 |------|-----------|----------|----------|
 | `request` | agent → controller | `action`, `summary` | `ref` (`{conversationId, messageId, threadId?}`), `amount`, `currency`, `details` (object), `ttl` |
 | `decision` | controller → agent | `requestId`, `outcome` (`approve` / `deny`) | `reason`, `result` (object) |
@@ -76,9 +76,9 @@ Example action names: `pay`, `x402.pay`, `copy.run`, `sign`. They are labels onl
 - A `decision` is accepted only from a `controller` that is the identity the `request` was sent to (`wrong_principal` otherwise), only for a `request` you sent in that conversation that has not expired, and only once (`bad_reference` for an unknown, expired or already-decided request).
 - `report` is accepted in either direction within the account.
 
-Rejected messages are reported on stderr (`[inbox] Message rejected: ...`) and skipped.
+Rejected messages are reported on stderr (`[inbox]`, or `[relay]` / `[direct]` under `ace listen`, `Message rejected: ...`) and skipped.
 
-**Known limitation.** If a controller pinned a delegate before the delegate added its principal, the pin has no principal. The SDK does one authenticated refresh of the sender's record before raising `wrong_principal`; if that refresh does not pick it up, messages stay `wrong_principal` until the pin refreshes (24 h TTL). Publish the principal before first contact where possible.
+**Known limitation.** If a controller pinned a delegate before the delegate added its principal, the pin has no principal. The SDK does one authenticated refresh of the sender's record before raising `wrong_principal`; if that refresh does not pick it up, messages stay `wrong_principal` until the pin refreshes (24 h TTL). A transient refresh failure leaves the message pending; it is retried, not rejected. Publish the principal before first contact where possible.
 
 ## Key custody
 

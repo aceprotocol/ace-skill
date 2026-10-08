@@ -49,7 +49,7 @@ The peer's encryption key differs from the pinned one and the new binding is not
 | `invalid_body` | Missing required field, wrong type, `ttl` not an integer, nesting deeper than 32 | Fix the body (schemas in `SKILL.md`) |
 | `limit_exceeded` | Thread or history bound reached | Use a new thread |
 | `invalid_principal` | `ace register --principal`: the record is not for this identity's key, has non-canonical `roles`, is expired or its signature fails (checked locally, before any network call); or the principal saved in `profile.json` expired (`ace register` fails, `ace listen` warns) | Get a new record signed for your `signingPublicKey` and `ace register --principal <file>`, or `ace register --drop-principal` |
-| `wrong_principal` | A `request` / `decision` / `report` from outside your account, a `decision` from a non-controller or from someone the request was not sent to, or you have no saved principal yourself | Both sides need principals for the same `account`, signed by the same owner key; see `references/principal.md` |
+| `wrong_principal` | A `request` / `decision` / `report` from outside your account, a `decision` from a non-controller or from someone the request was not sent to, or you have no saved principal yourself | Both sides need principals for the same `account`, signed by the same owner key (or, for `eip155`, a secp256k1 signer whose address is the account); see `references/principal.md` |
 
 `text`, `info` and the principal types `request` / `decision` / `report` are never subject to the state machine. For a principal `decision`, `bad_reference` means the request is unknown, expired or already decided.
 
