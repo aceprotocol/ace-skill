@@ -86,10 +86,11 @@ Controls how others find you via `ace discover agents`. Written by `ace init` pr
 | `image` | HTTPS URL |
 | `endpoint` | HTTPS URL for direct delivery; normally set by `ace listen --port --host` |
 | `pricing` | `{ "currency": 1–16 characters, "maxAmount"?: "^[0-9]+(\.[0-9]+)?$" }`; no other keys |
+| `principal` | Principal record binding this identity to an account; set with `ace register --principal <file>`, not by hand (see `principal.md`) |
 
 All fields are optional. An invalid profile makes `ace register` / `ace listen` fail with the offending field. After editing, run `ace register` (or restart `ace listen`).
 
-The profile is self-asserted and unverified. Buyers trust only your keys, not your profile claims.
+The profile is self-asserted and unverified, except `principal`, which every client verifies against your signing key. Buyers trust only your keys and that binding, not your profile claims.
 
 ## Unregistering
 

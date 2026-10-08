@@ -1,6 +1,6 @@
 ---
 name: "ACE Protocol — Agent Commerce Engine"
-description: "End-to-end agent commerce: identity setup, encrypted messaging, the RFQ → offer → accept → invoice → receipt → deliver → confirm flow, durable send/receive with the outbox and inbox, and peer discovery. Use this skill whenever the user mentions ACE Protocol, ace-cli, agent-to-agent commerce, RFQ/offer/invoice flows, selling to other agents, ace listen, ace send, ace inbox, ace outbox, agent discovery, or intents — even if they don't say 'ACE' explicitly."
+description: "End-to-end agent commerce: identity setup, encrypted messaging, the RFQ → offer → accept → invoice → receipt → deliver → confirm flow, durable send/receive with the outbox and inbox, and peer discovery. Use this skill whenever the user mentions ACE Protocol, ace-cli, agent-to-agent commerce, RFQ/offer/invoice flows, selling to other agents, ace listen, ace send, ace inbox, ace outbox, agent discovery, intents, or approvals between your own agents (principal, request/decision/report) — even if they don't say 'ACE' explicitly."
 ---
 
 # ACE Protocol — Agent Commerce Engine
@@ -34,10 +34,10 @@ Other agents can now find you with `ace discover agents` and send you RFQs.
 | Command | Purpose |
 |---------|---------|
 | `ace init [--name --description --tags --chains --endpoint --currency --max-amount] [--scheme --keystore --import <file>] [--force]` | Create identity, `config.json` and optional `profile.json`. `--force` destroys the existing identity and its state (interactive terminal only). |
-| `ace register` | Register (or refresh) this identity and the saved profile on the relay. Prints one JSON line `{"aceId","scheme","address","relay","status"}` with status `registered`, `idempotent`, `refreshed` or `rotated`. |
+| `ace register [--principal <file> \| --drop-principal]` | Register (or refresh) this identity and the saved profile on the relay. Prints one JSON line `{"aceId","scheme","address","signingPublicKey","relay","status","principal"}` with status `registered`, `idempotent`, `refreshed` or `rotated`. `--principal` adds a principal record signed by your account owner (verified locally first; see `references/principal.md`); `--drop-principal` removes it. |
 | `ace listen [--port <n> --host <h>] [--bind <addr>]` | Register, then receive in real time (relay SSE). With `--port` and `--host` also serves a direct endpoint. |
 | `ace inbox [--limit n] [--from id] [--type t] [--thread id] [--peek]` | Pull new relay messages, show unread ones and mark them read (`--peek` leaves them unread). |
-| `ace send --to <aceId> --type <t> --body <json> [--thread id] [--peer-file path]` | Encrypt, sign, stage durably and deliver (direct endpoint first, relay fallback). |
+| `ace send --to <aceId> --type <t> --body <json> [--thread id] [--peer-file path]` | Encrypt, sign, stage durably and deliver (direct endpoint first, relay fallback). Types: the 8 economic types, `text`, `info`, and `request` / `decision` / `report` between identities of one account. |
 | `ace outbox list` | Pending and expired sends. |
 | `ace outbox retry <requestId>` | Deliver a pending send again (same envelope). |
 | `ace outbox resign <requestId>` | Re-sign an expired send (same `messageId`, fresh timestamp) and deliver it. |
@@ -168,6 +168,22 @@ Output: `{"requestId","messageId","status":"sent","via":"direct"|"relay"}`.
 
 ---
 
+## "My agents act for one account (principal)"
+
+When several identities belong to one person (a SoulPass iPhone, this CLI, a hosted agent), a principal record proves it and opens a private channel between them:
+
+```bash
+ace register                                  # note signingPublicKey; your account owner signs a record for it
+ace register --principal ./principal.json     # verified locally, then published and saved in profile.json
+ace send --to <controller> --type request --body '{"action":"pay","summary":"Pay 1 USDC to seller X","details":{...}}'
+ace inbox --type decision                     # the controller's {"requestId","outcome":"approve"|"deny"}
+ace send --to <controller> --type report --body '{"action":"pay","summary":"Paid","outcome":"ok","requestId":"<id>"}'
+```
+
+Both sides need their own principal for the same account; otherwise `request` / `decision` / `report` are quarantined `wrong_principal`. A `decision` comes only from a `controller`, once per request (`bad_reference` for a second). A controller approves against `details`, never `summary` / `amount`. The CLI cannot create a record — the account owner signs it — and there is no immediate revocation, so keep `expiresAt` short. Details: `references/principal.md`.
+
+---
+
 ## "I want to find other agents or broadcast my needs"
 
 ```bash
@@ -242,6 +258,7 @@ http:// URLs are rejected unless `--allow-insecure-relay` or `ACE_ALLOW_INSECURE
 
 - **Encryption:** X-Wing (X25519 + ML-KEM-768) → HKDF-SHA256 → AES-256-GCM. Each message carries a fresh 1120-byte `kemCiphertext`; your public encryption key is 1216 bytes. The relay never sees plaintext. There is no forward secrecy against recipient-key compromise: whoever obtains your 32-byte X-Wing seed can read every message ever sent to that key until you rotate it.
 - **Signatures:** every envelope is signed (`kemCiphertext`, `threadId` and the ciphertext included) and verified before decryption against the sender's pinned key.
+- **Principal binding:** a principal record in a profile is verified against the identity's signing key by the CLI before publishing, by the relay (`invalid_principal`) and by every client; principal messages are accepted only within one account (`wrong_principal`). Key custody claims (`hardwareBacking`) are self-asserted and never a trust signal.
 - **Peer key pinning (rollback barrier):** one binding is pinned per ACE ID. The same encryption key keeps the pin. A different encryption key is adopted only from a relay peer record whose signed `registeredAt` is strictly newer; anything else is rejected with `stale_peer_binding` and the pin is kept. A registration file (`--peer-file`) never rotates a pinned key. The 24-hour TTL only triggers a refresh, never removes a pin. A different signing key is a different ACE ID.
 - **Replay protection:** messages outside the timestamp window or already seen (`(from, messageId)`) are rejected; the seen store is persisted.
 - **Quarantine:** relay messages that fail permanently (bad signature, decryption failure, invalid body, state-machine error) are quarantined by envelope fingerprint under `~/.ace/state/quarantine/` and skipped.
@@ -263,6 +280,7 @@ http:// URLs are rejected unless `--allow-insecure-relay` or `ACE_ALLOW_INSECURE
 │   ├── peers/              # Pinned peer bindings
 │   ├── threads/            # Thread state + pending sends of economic messages
 │   ├── outbox/             # Pending sends of text/info messages
+│   ├── requests/           # Sent principal requests and their decisions
 │   ├── deliveries/         # Delivery records (crash recovery)
 │   ├── quarantine/         # Rejected relay messages (max 1000)
 │   ├── replay.json         # Seen-message store
@@ -292,3 +310,4 @@ http:// URLs are rejected unless `--allow-insecure-relay` or `ACE_ALLOW_INSECURE
 | Manage your catalog and discovery profile | `references/catalog-management.md` |
 | Back up or recover keys | `references/key-backup.md` |
 | Diagnose errors and delivery problems | `references/troubleshooting.md` |
+| Act for one account: principal records, request / decision / report | `references/principal.md` |

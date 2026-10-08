@@ -93,7 +93,7 @@ All fields are optional. `pricing` may contain only `currency` and `maxAmount`. 
 ### 4. Register and Listen
 
 ```bash
-ace register   # {"aceId":"ace:sha256:...","scheme":"ed25519","address":"...","relay":"https://relay.aceprotocol.org","status":"registered"}
+ace register   # {"aceId":"ace:sha256:...","scheme":"ed25519","address":"...","signingPublicKey":"...","relay":"https://relay.aceprotocol.org","status":"registered","principal":null}
 ace listen
 ```
 
