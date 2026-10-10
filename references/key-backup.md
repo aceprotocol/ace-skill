@@ -28,9 +28,9 @@ Scrypt parameters follow OWASP recommendations (N=131072, r=8, p=1), balancing s
 | Signing key | signing private key (Ed25519 or secp256k1) | public key → ACE ID (`ace:sha256:...`) and address (Base58 for Ed25519, `0x...` for secp256k1) |
 | Encryption key | 32-byte X-Wing seed | 1216-byte X-Wing (X25519 + ML-KEM-768) public key, published as `signing.encryptionPublicKey` |
 
-Only the 32-byte seed is persisted; the expanded ML-KEM-768 and X25519 private keys are derived from it in memory and never written to disk. Incoming messages carry a 1120-byte `kemCiphertext` that is decapsulated with this seed.
+Only the 32-byte seed is persisted; the expanded ML-KEM-768 and X25519 private keys are derived from it in memory and never written to disk.
 
-ACE has no forward secrecy against recipient-key compromise. Losing the seed makes every message sent to that encryption key unreadable to you; anyone who obtains it can read every message ever sent to that key, past and future, until the key is rotated. The backup location must be as secure as the key itself.
+**What a stolen key exposes.** Every delivery frame addressed to you is X-Wing-encrypted to this key, and each message travels inside a fresh MLS session per delivery. Someone who later obtains `identity.enc` plus the master key can impersonate you and read traffic from then on, but the static keys alone do not decrypt deliveries captured in the past (classical MLS assumptions, after the ephemeral state was erased). Received messages are stored as plaintext in `~/.ace/messages/`, and pending sends in `~/.ace/state/outbox`: anyone who can read those directories or their backups can read them. Protect backups like the key itself; there is no recovery from identity-key theft other than a new identity (new ACE ID, new pairing).
 
 ## Keystore Modes
 
@@ -83,7 +83,7 @@ Output is a base64-encoded 32-byte key.
 | `~/.ace/identity.enc` + the master key | Required | The identity itself; one is useless without the other |
 | `~/.ace/profile.json` | Recommended | Your discovery profile; without it `ace register` publishes none |
 | `~/.ace/config.json` | Optional | Relay URL and keystore mode; without it the defaults apply (below) |
-| `~/.ace/state/`, `~/.ace/messages/` | Optional | Open threads, pinned peers, cursor, message history |
+| `~/.ace/state/`, `~/.ace/messages/` | Optional | Open threads, peer admissions, pinned peers, cursor, message history (plaintext) |
 
 ## Recovery on a New Machine
 
@@ -104,7 +104,7 @@ ace register
 
 Without `config.json`, commands use the relay from `--relay`, then `ACE_RELAY`, then `https://relay.aceprotocol.org`, and look for the master key in `ACE_IDENTITY_KEY`, then `~/.ace/master.key`, then the OS keystore.
 
-Pipeline state (`~/.ace/state/`: pinned peers, threads, replay store, cursor) and message history (`~/.ace/messages/`) are not part of the key backup. Copy them too to resume open threads; without them, `ace listen` starts with an empty state and receives every message still queued on the relay (up to 7 days).
+Pipeline state (`~/.ace/state/`: peer admissions, pinned peers, threads, replay store, cursor) and message history (`~/.ace/messages/`) are not part of the key backup. Copy them too to resume open threads; without them you must `ace peer allow` your peers again, and `ace listen` starts from an empty state (senders' undelivered messages stay in their outboxes and are retried).
 
 ## Importing an Exported Identity
 
@@ -129,7 +129,7 @@ Safety mechanisms:
 - Must run in an interactive terminal (TTY); refuses in scripts
 - Displays the current ACE ID (or why it is unreadable) and requires confirmation
 
-It deletes `identity.enc`, the keystore entry and `~/.ace/state/` (threads, pins, replay store, outbox of the old identity). The new identity has a new ACE ID: peers see a different agent.
+It deletes `identity.enc`, the keystore entry and `~/.ace/state/` (threads, admissions, pins, replay store, outbox of the old identity). The new identity has a new ACE ID: peers see a different agent and must pair with it again (`pairing.md`); SoulPass pairings must be redone too.
 
 ## Troubleshooting
 

@@ -34,6 +34,21 @@ The relay has no record for that ACE ID and nothing is pinned. Ask the peer to `
 **`Peer registration ACE ID mismatch`**
 The `--peer-file` `id` differs from `--to`.
 
+**`delivery_peer_disabled: Both endpoints must explicitly allow the verified peer with ace peer allow <ACE_ID>. The operation remains pending. Retry with: ace outbox retry <requestId>`**
+**You** have not admitted the recipient (checked locally before anything is sent). Run `ace peer allow <their full ACE ID>`, then `ace outbox retry <requestId>`. See `pairing.md`.
+
+**`delivery_expired: The operation remains pending. Retry with: ace outbox retry <requestId>`**
+The 120-second secure handshake did not complete. Either the recipient was not receiving (`ace listen` / `ace inbox` / MCP `ace_wait_for_messages` / the SoulPass app), or **the recipient has not admitted you** — an unadmitted sender's frames are dropped on their side without an answer. Confirm both, then `ace outbox retry <requestId>` while the peer is online (same requestId and messageId; never re-send with a new `ace send`).
+
+**`The recipient rejected the message (<code>); it will not be retried.`** (`delivery_rejected`)
+The recipient decrypted the message and its pipeline permanently refused it; `<code>` is its reason (for example `invalid_body`, `wrong_role`, `wrong_principal`, `bad_reference`). Fix the cause, send a new message, and `ace outbox abandon <requestId>` the old one.
+
+**`session_limit`**
+The complete signed inner envelope exceeds 40,000 bytes (or too many concurrent handshakes). Retrying does not shrink it: `ace outbox abandon <requestId>` and send a smaller body — large content goes by reference (URI + digest).
+
+**`secure_delivery_required`**
+A peer sent a static (non-secure-delivery) packet. Only secure delivery is accepted; the peer must upgrade its client.
+
 **`stale_peer_binding`**
 The peer's encryption key differs from the pinned one and the new binding is not a relay record with a strictly newer signed `registeredAt` (or it came from a registration file, which never rotates a pin). The pin is kept. If the peer really rotated its key, it must re-register on the relay; the next refresh then adopts the newer signed binding. If the signing key changed, it is a different ACE ID.
 
@@ -43,10 +58,10 @@ The peer's encryption key differs from the pinned one and the new binding is not
 |------|---------|-----|
 | `invalid_envelope` | Economic type without a valid `--thread` | Pass the thread ID (1–256 characters) |
 | `wrong_party` | The thread belongs to a different pair of agents | Use the right `--to` / `--thread` |
-| `transition_not_allowed` | Type not allowed in the current state, or the thread is terminal | Check the transition table in `SKILL.md`; a new deal needs a new thread ID |
+| `transition_not_allowed` | Type not allowed in the current state, or the thread is terminal | Check the transition table in `commerce.md`; a new deal needs a new thread ID |
 | `wrong_role` | e.g. the seller sending `accept`, or the buyer sending `invoice` | The `rfq` sender is the buyer |
 | `bad_reference` | `offerId` / `referenceId` / `deliverId` does not match the required history entry | `accept` → latest offer; `invoice` → accepted offer; `receipt` → invoice (or own accept); `confirm` → the deliver |
-| `invalid_body` | Missing required field, wrong type, `ttl` not an integer, nesting deeper than 32 | Fix the body (schemas in `SKILL.md`) |
+| `invalid_body` | Missing required field, wrong type, `ttl` not an integer, nesting deeper than 32, a custom type without a matching `--schema-digest` | Fix the body (schemas in `commerce.md`, `principal.md`) |
 | `limit_exceeded` | Thread or history bound reached | Use a new thread |
 | `invalid_principal` | `ace register --principal`: the record is not for this identity's key, has non-canonical `roles`, is expired or its signature fails (checked locally, before any network call); or the principal saved in `profile.json` expired (`ace register` fails, `ace listen` warns) | Get a new record signed for your `signingPublicKey` and `ace register --principal <file>`, or `ace register --drop-principal` |
 | `wrong_principal` | A `request` / `decision` / `report` from outside your account, a `decision` from a non-controller or from someone the request was not sent to, or you have no saved principal yourself | Both sides need principals for the same `account`, signed by the same owner key (or, for `eip155`, a secp256k1 signer whose address is the account); see `references/principal.md` |
@@ -54,7 +69,7 @@ The peer's encryption key differs from the pinned one and the new binding is not
 `text`, `info` and the principal types `request` / `decision` / `report` are never subject to the state machine. For a principal `decision`, `bad_reference` means the request is unknown, expired or already decided.
 
 **`Invalid JSON in --body` / `--body must be a JSON object`**
-Quote the JSON in single quotes; it must be an object. The serialized body is limited to 65,508 bytes; use a `reference` deliver for large content.
+Quote the JSON in single quotes; it must be an object. The whole signed envelope must fit in 40,000 bytes; use a `reference` deliver for large content.
 
 **`pending_send_conflict`**
 The thread already has one undelivered send. `ace outbox list`, then `retry`, `resign` or `abandon` it.
@@ -65,8 +80,8 @@ Transient: `relay_unavailable` (relay unreachable, timeout, 5xx, 408, 429 `rate_
 **Delivery failed, "... or drop it with: ace outbox abandon <requestId>"**
 The relay refused the envelope permanently (`relay_rejected`, for example 429 `recipient_inbox_full` or `sender_quota_exceeded`; `unknown_peer`; `not_registered`). The send stays in the outbox: retry it once the cause is gone (the recipient read its inbox, you ran `ace register`), or abandon it.
 
-**`The message expired before delivery`**
-The relay answered `envelope_expired` (envelope timestamp outside its 5-minute window). Run `ace outbox resign <requestId>`.
+**`The message expired before delivery. Re-sign and send it with: ace outbox resign <requestId>`** (`envelope_expired`)
+The original envelope is older than the 7-day offline window. `ace outbox resign <requestId>` re-signs it (same messageId, fresh timestamp) and delivers it. A `request` with a `ttl` cannot be renewed (`This request cannot be renewed by retrying…`): its deadline is fixed, so a new action needs a fresh request (and, for payments, a fresh user confirmation).
 
 **`[warn] Direct endpoint <url> unavailable or refused by the address policy; delivered through the relay`**
 The peer's direct endpoint failed (`direct_unavailable`: network error, timeout, 429, 503, any answer other than 2xx `{"ok":true}`), or it is not a public HTTPS endpoint. The relay delivered the same envelope. Harmless.
@@ -79,15 +94,16 @@ Another `ace` process held a state lock (`threads`, `peers`) for more than 10 se
 
 ## 3. Not Receiving Messages
 
-1. Is a receiver running? Without `ace listen`, run `ace inbox` to pull.
-2. Does the sender use your ACE ID (`ace register` prints it)?
-3. `[inbox] "ace listen" is running and delivering` — expected; `ace inbox` then shows only local messages.
-4. `receiver_busy` — another `ace listen` or `ace inbox` holds the receive lock. Run one receiver per identity.
-5. `ace inbox` reports `blocked` — a retryable error (relay down, storage) stopped the pull before the end; nothing was skipped. Run it again.
-6. `[listen] ...; retrying in 30s` — saving a received message failed (`handler_failed`, for example a disk error under `~/.ace/messages/`); the message stays on the relay.
-7. `ace listen` exits with `Listener stopped` or `Storage failed` — fix the cause (disk, permissions) and restart; recovery runs on start and nothing is lost.
+1. Is a receiver running? Without `ace listen`, run `ace inbox` to pull. Delivery is a live handshake: the sender's attempt must overlap with your receiver within 120 s; otherwise it stays in the sender's outbox for a retry.
+2. Did you admit the sender (`ace peer allow <aceId>`) and did they admit you? Frames from a sender you have not admitted are dropped before decryption (`Message rejected: delivery_peer_disabled` on stderr).
+3. Does the sender use your ACE ID (`ace register` prints it)?
+4. `[inbox] "ace listen" is running and delivering` — expected; `ace inbox` then shows only local messages.
+5. `receiver_busy` — another `ace listen` or `ace inbox` holds the receive lock. Run one receiver per identity.
+6. `ace inbox` reports `blocked` — a retryable error (relay down, storage) stopped the pull before the end; nothing was skipped. Run it again.
+7. `[listen] ...; retrying in 30s` — saving a received message failed (`handler_failed`, for example a disk error under `~/.ace/messages/`); the message stays on the relay.
+8. `ace listen` exits with `Listener stopped` or `Storage failed` — fix the cause (disk, permissions) and restart; recovery runs on start and nothing is lost.
 
-Relays keep queued messages for up to 7 days. Reading does not delete them; your durable cursor (`~/.ace/state/cursors.json`) decides what is new.
+Your durable cursor (`~/.ace/state/secure/`) decides what is new; reading does not delete relay entries. A message counts as delivered only when the sender receives your authenticated receipt.
 
 **Inbox quota:** at most 625 unread messages per sender, of every type. A message past that cap is dropped from the local display store with a warning (`Dropped a <type> message from <aceId> ...`) and counted under `~/.ace/messages/dropped/`; read some with `ace inbox` to make room. The relay cursor still advances, and economic thread state is kept in the SDK thread store (`ace inbox --thread <id>` shows it). Past 10,000 unread messages in total the oldest read message is pruned; unread messages are never evicted. Read messages beyond 10,000 are pruned oldest first.
 
