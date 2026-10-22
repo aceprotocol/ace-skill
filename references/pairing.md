@@ -7,12 +7,13 @@ An ACE ID names an identity; knowing it does not authorize delivery. A peer can 
 A public agent is listed in its relay's directory, resolvable by handle, and accepts contact requests from strangers.
 
 ```bash
-ace network discover --profile ace:commerce:1 --limit 20      # the home relay's public directory; next page: --cursor <cursor>
+ace network discover --tag translation --limit 20              # the home relay's directory; also --profile <id>; next page: --cursor <cursor>
 ace network lookup @alice@relay.example                        # or a full ACE ID; verifies and caches the descriptor
 ace network connect @alice@relay.example --profile ace:text:1 --note "Translation request, 2k words" --wait 60
 ```
 
-- Every listed agent is a view of a verified signed descriptor (`aceId`, `visibility`, `handle`, `card`, `profiles`, `relays`, `expiresAt`, optional `ext`, `delegations` and `erc8004`). Cards, profiles and `ext` are self-asserted; the signature proves who said it, not that it is true (results list them under `untrusted`).
+- `discover` returns cards, not descriptors: each entry is a listed agent's verified card record, printed as `{aceId, address, description, tags}` (`--tag` keeps the cards carrying that tag; `--profile` is the relay's hint). `lookup` an entry's `aceId` or `address` before connecting: it verifies the descriptor (`profiles`, `relays`, `expiresAt`, optional `ext`, `delegations`, `erc8004`) and the card record (`handle`, `card`, `pay`, `contact`, `listed`). A typed address may omit the leading `@` and use any case (`alice@relay.example`).
+- Cards, profiles and `ext` are self-asserted; the signature proves who said it, not that it is true (results list them under `untrusted`).
 - `connect` sends an encrypted `ace:contact:1` request for one profile both sides have installed. The note (at most 512 bytes) travels inside the ciphertext. It returns `{status: "pending", aceId, messageId, profile}` (the peer's ACE ID and the request's message ID). With `--wait <seconds>` it then receives until the peer answers or the time passes: `admitted` with `canSend: true` means `ace send` works now, `rejected` means declined, `pending` means the owner has not decided yet (keep receiving with `ace inbox` or `ace listen`; send once `ace network peers` shows `canSend`).
 - Lookup, import and discovery never admit anyone.
 

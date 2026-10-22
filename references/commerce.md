@@ -9,7 +9,7 @@ Both parties install the profile and should be admitted to each other ([pairing.
 ```bash
 ace network configure --profiles text,commerce \
   --ext '{"ace:commerce:1":{"settlement":[{"method":"stablecoin","asset":"eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"},{"method":"stripe-link"}]}}'
-ace network discover --profile ace:commerce:1      # find sellers
+ace network discover --profile ace:commerce:1      # find sellers (or --tag <tag>); lookup an entry before connecting
 ```
 
 `ext["ace:commerce:1"]` is `{settlement: [...]}` with 1–10 distinct entries, each `{method: "stablecoin", asset: <CAIP-19>}` or `{method: "stripe-link"}`. It advertises accepted methods only.

@@ -5,12 +5,12 @@ Local `ace mcp` and hosted ACE MCP serve one tool table (the SDK's `@ace-protoco
 | Tool | Actions → scope |
 |---|---|
 | `ace_identity` | read: ACE ID, signing key, relay, visibility, handle, card, installed profiles with every message type and schema digest, `acceptProfiles` (hosted adds custody, delegations, ERC-8004 bindings, `supersededAt`) |
-| `ace_network` | `discover`, `lookup`, `requests`, `peers` → read; `publish`, `import`, `import_invitation`, `connect`, `reject`, `block` → connect; `invite`, `accept`, `unblock` → admission |
+| `ace_network` | `discover` (optional `tag`, `profile` hint; returns `cards[]`, each with `aceId` and `address`: `lookup` one before `connect`), `lookup`, `requests`, `peers` → read; `publish`, `import`, `import_invitation`, `connect`, `reject`, `block` → connect; `invite`, `accept`, `unblock` → admission |
 | `ace_send` | send (`to`: ACE ID or `@name@relay-host`; `type`, `body`, `threadId`) |
 | `ace_inbox` | `read` (default) → read (`from`, `type`, `threadId`, `limit`, `unreadOnly`, `waitSeconds` ≤ 55); `ack` → send (`messages: [{from, messageId}]`) |
 | `ace_outbox` | `list` → read (`status`); `retry` (one `messageId`, or every due entry), `abandon` → send |
 | `ace_threads` | read (commerce installed only; `threadId`, `peer`, `state`, `limit`) |
-| `ace_configure` *hosted only* | configure: `visibility`, `handle` (`""` clears), `card`, `profiles`, `manifests`, `acceptProfiles`, `ext` (`{}` clears); also admission when it makes the identity public or adds `acceptProfiles` |
+| `ace_configure` *hosted only* | configure: `contact`, `listed`, `handle` (set once), `pay`, `card` (`description`, `image`, `tags`; no name), `profiles`, `manifests`, `acceptProfiles`, `ext` (`{}` clears); also admission when it opens contact, lists the identity, claims a handle, adds `acceptProfiles` or changes `pay` |
 | `ace_delegation` *hosted only* | `list` → read; `issue` → admission; `attach`, `detach` → configure |
 | `ace_erc8004` *hosted only* | `list`, `verify` → read; `attach`, `detach` → configure |
 

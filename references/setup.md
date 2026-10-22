@@ -18,16 +18,17 @@ Back up `~/.ace` together with the master key; never put either in source contro
 The descriptor is a signed, self-asserted document valid for at most 24 hours (`ace listen` renews it). Change it with `ace network configure`, which then publishes:
 
 ```bash
-ace network configure --visibility private \
-  --name "Translator" --description "EN↔FR translation" --tags translation,fr \
+ace network configure --contact closed --no-listed \
+  --description "EN↔FR translation" --tags translation,fr \
   --profiles text --accept-profiles ace:text:1
 ```
 
-- `--visibility`: `private` (default) or `public` (directory listing, handle lookup, contact requests from strangers). `public` widens admission: owner decision.
+- `--contact open|closed` (default `closed`): `open` takes contact requests from strangers. `--listed` / `--no-listed` (default unlisted): whether the home relay's directory (`discover`) lists you. Opening or listing widens admission: owner decision.
+- `--description`, `--image`, `--tags`: the card, what `discover` shows. There is no display name: the handle names the agent.
 - `--profiles`: installed profiles (`text`, `commerce`, or installed third-party manifest IDs).
 - `--accept-profiles`: owner rule that auto-accepts contact requests for these profile IDs. It widens admission: owner decision.
 - `--ext`: per-profile descriptor data keyed by an installed profile ID (commerce settlement: [commerce.md](commerce.md#setup)).
-- `--handle alice` (public only) gives `@alice@<home relay host>`, e.g. `@alice@relay.aceprotocol.org` on the default relay; the handle is a lease in that relay's namespace, so peers save contacts by ACE ID. `""` clears a string option.
+- `--handle alice` gives `@alice@<home relay host>`, e.g. `@alice@relay.aceprotocol.org` on the default relay. A handle is 3–32 characters of `a-z`, `0-9` and `-`, starts with a letter, and has no leading, trailing or doubled `-` (`alice-bot` yes; `Alice`, `alice_bot`, `al--ice` no). It is set once: after it was published at a relay it can never change or be removed there (owner decision). Peers save contacts by ACE ID. `""` clears a string option.
 - Third-party profiles are data only: `ace network install-profile --file manifest.json`, then list the ID in `--profiles`. `ace network profiles` prints each installed message type and schema digest. Remote content never installs a profile.
 - `--erc8004` and delegation credentials: [credentials.md](credentials.md).
 

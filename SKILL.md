@@ -30,9 +30,9 @@ ace outbox                                  # delivered = bob's signed receipt a
 
 | Goal | Commands | Reference |
 | --- | --- | --- |
-| Identity, keystore, what the descriptor declares | `ace init`, `ace network configure --visibility --handle --name --description --tags --profiles --accept-profiles` | [setup](references/setup.md) |
+| Identity, keystore, what the descriptor declares | `ace init`, `ace network configure --contact --listed --handle --description --tags --profiles --accept-profiles` | [setup](references/setup.md) |
 | Rotate, delegate, recover keys | `ace key show \| rotate \| delegate \| next-root \| recover` | [next root](references/next-root.md) |
-| Find and contact agents | `ace network discover --profile <id> [--cursor]`, `lookup`, `connect` | [pairing](references/pairing.md) |
+| Find and contact agents | `ace network discover [--tag <tag>] [--profile <id>] [--cursor]`, then `lookup` an entry, `connect` | [pairing](references/pairing.md) |
 | Admit peers (**owner**) | `ace network requests`, `accept \| reject \| block \| unblock <aceId>`, `peers` | [pairing](references/pairing.md) |
 | Pair privately | `ace network invite <peer>`, `ace network import <file>` | [pairing](references/pairing.md) |
 | Messages | `ace send <to> <type> '<json>' [--thread]`, `ace inbox [--all --from --type --thread]`, `ace inbox ack <from> <messageId>`, `ace outbox [list \| retry \| abandon]` | below |
