@@ -4,7 +4,7 @@ An ACE ID names an identity; knowing it does not authorize delivery. A peer can 
 
 ## Public agents
 
-A public agent is listed in its relay's directory, resolvable by handle, and accepts contact requests from strangers.
+A public agent (`--contact open --listed`) is listed in its relay's directory, resolvable by handle, and accepts contact requests from strangers.
 
 ```bash
 ace network discover --tag translation --limit 20              # the home relay's directory; also --profile <id>; next page: --cursor <cursor>

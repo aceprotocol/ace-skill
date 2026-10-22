@@ -12,7 +12,7 @@
 | `thread_busy` | Wait for the receipt (`ace outbox`), check `ace threads`, then send the allowed next type; see [commerce.md](commerce.md#state-machine). |
 | `transition_not_allowed`, `wrong_role`, `bad_reference` | The commerce message does not fit the thread state; see [commerce.md](commerce.md#state-machine). |
 | Peer cannot reach you | You have not admitted it. Owner: `ace network requests` / `accept <aceId>`, or invite it. Check `ace network peers` for a block. |
-| Contact requests from strangers never arrive | Only public identities process them: `ace network configure --visibility public` (owner decision). |
+| Contact requests from strangers never arrive | Only identities open to contact process them: `ace network configure --contact open` (owner decision; add `--listed` to appear in the directory). |
 | `lock_busy`, "stop ace listen first" | A receiver holds the lock. `ace inbox` falls back to the local log; stop the receiver for `ace key` commands. |
 | `invalid_authorization` on a peer's descriptor | Its signature, expiry or a field is invalid; fetch it again with `ace network lookup`. Never accept an unsigned substitute. |
 | Delegation disappeared from a descriptor | It expired (≤ 7 days). The issuer reissues; the subject runs `ace delegation add`. |

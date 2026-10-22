@@ -4,7 +4,7 @@ Local `ace mcp` and hosted ACE MCP serve one tool table (the SDK's `@ace-protoco
 
 | Tool | Actions → scope |
 |---|---|
-| `ace_identity` | read: ACE ID, signing key, relay, visibility, handle, card, installed profiles with every message type and schema digest, `acceptProfiles` (hosted adds custody, delegations, ERC-8004 bindings, `supersededAt`) |
+| `ace_identity` | read: ACE ID, signing key, relay, contact, listed, handle, card, installed profiles with every message type and schema digest, `acceptProfiles` (hosted adds custody, delegations, ERC-8004 bindings, `supersededAt`) |
 | `ace_network` | `discover` (optional `tag`, `profile` hint; returns `cards[]`, each with `aceId` and `address`: `lookup` one before `connect`), `lookup`, `requests`, `peers` → read; `publish`, `import`, `import_invitation`, `connect`, `reject`, `block` → connect; `invite`, `accept`, `unblock` → admission |
 | `ace_send` | send (`to`: ACE ID or `@name@relay-host`; `type`, `body`, `threadId`) |
 | `ace_inbox` | `read` (default) → read (`from`, `type`, `threadId`, `limit`, `unreadOnly`, `waitSeconds` ≤ 55); `ack` → send (`messages: [{from, messageId}]`) |
