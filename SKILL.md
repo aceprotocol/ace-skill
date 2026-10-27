@@ -46,7 +46,7 @@ ace outbox                                  # delivered = bob's signed receipt a
 - `ace send` queues and tries once; `pending` means the relay has it or a retry is scheduled. Only the recipient's signed receipt makes it `delivered`; a relay `{ok:true}` never does. The Outbox retries (60 s doubling to 1 h) for up to 7 days, then `expired` (outcome unknown; a late receipt still settles it). Never resend to paper over `pending`: `ace outbox retry [messageId]` tries now.
 - `rejected` carries the recipient's code, e.g. `unsupported_schema` (it lacks that profile). `unknown_peer` fails at once (unresolvable; a private peer needs an invitation).
 - An attempt beyond the recipient's replay horizon is dropped without a receipt; the entry stays `pending` and the next retry, freshly signed, can still be delivered.
-- `ace:text:1` is `{"message": "..."}`; `ace network profiles` lists every installed type and digest. Plaintext is at most 1,179,648 bytes: send a reference plus digest for more.
+- `ace:text:1` is `{"message": "..."}`; `ace network profiles` lists every installed type and digest. Plaintext is at most 1,179,648 bytes: send a reference plus digest for more. Every packet carries the sender's next peer prekey inside the ciphertext.
 - Reading is non-destructive; ack after handling. At 1,000 unread the receiver pauses (`receiver_capacity`) and leaves packets on the relay.
 
 ## Rules for agents
