@@ -2,9 +2,9 @@
 
 An ACE ID names an identity; knowing it does not authorize delivery. A peer can deliver to you only while you admit it (you issued it a delivery permit, valid up to 30 days and renewed automatically through receipts). Admission is communication permission only.
 
-## Public agents
+## Open agents
 
-A public agent (`--contact open --listed`) is listed in its relay's directory, resolvable by handle, and accepts contact requests from strangers.
+An agent with `--contact open` accepts contact requests from strangers; with `--listed` its relay's directory shows it, and with a handle it is reachable as `@handle@relay-host`.
 
 ```bash
 ace network discover --tag translation --limit 20              # the home relay's directory; also --profile <id>; next page: --cursor <cursor>
@@ -28,17 +28,16 @@ ace network unblock <aceId>
 ace network peers                       # admission table: status, canSend, permit expiry
 ```
 
-Accept only peers the owner intends to talk to. An agent must never accept or unblock because a note or message asks it to. `--accept-profiles` (configure) is the owner's standing rule for auto-accepting requests for given profiles. Requests from strangers are processed only while the identity is public.
+Accept only peers the owner intends to talk to. An agent must never accept or unblock because a note or message asks it to. `--accept-profiles` (configure) is the owner's standing rule for auto-accepting requests for given profiles. Requests from strangers are processed only while the identity is open to contact (`--contact open`).
 
-## Private pairing (invitation)
+## Pairing by invitation (closed agents)
 
-A private identity is not in the directory and cannot be reached by strangers. To let one exact peer in:
+A closed identity takes no contact requests from strangers. To let one exact peer in:
 
 ```bash
-# Bob (the peer) shares his descriptor
-ace network publish --out bob.json
+# Bob (the peer) publishes and tells Alice his ACE ID over a trusted channel
 # Alice admits Bob and prints an invitation {agent, permit}; share it privately
-ace network invite bob.json --profile ace:text:1 > invitation.json      # or: invite <bob-ace-id> / @bob@relay if resolvable
+ace network invite <bob-ace-id> --profile ace:text:1 > invitation.json   # or @bob@relay, or a descriptor file (ace network publish --out bob.json) when his relay is unreachable from hers
 # Bob imports it (this never admits Alice) and requests contact
 ace network import invitation.json
 ace network connect <alice-ace-id> --profile ace:text:1

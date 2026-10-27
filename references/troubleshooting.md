@@ -3,7 +3,8 @@
 | Symptom | Fix |
 |---|---|
 | `not_permitted` on send | You hold no valid delivery permit from the peer: it has not accepted you yet (or changed its signing key and has not sent a fresh permit). Nothing was queued; wait for the acceptance (`ace network peers` shows `canSend`), then send. |
-| `unknown_peer` on send, connect or `ace delegation add` | The peer's (or the credential issuer's) descriptor cannot be resolved, or it expired. A private peer must share its descriptor or an invitation; `ace network import <file>`. Check the full ACE ID and that its relay is reachable. Private identities are absent from discovery. |
+| `unknown_peer` on send, connect or `ace delegation add` | The peer's (or the credential issuer's) descriptor cannot be resolved: not registered at that relay, or it expired. Check the full ACE ID and that its relay is reachable; a peer whose relay you cannot reach can share its descriptor file (`ace network import <file>`). |
+| `not_permitted` on connect | The peer is closed to contact. Ask its owner for an invitation, then `ace network import invitation.json`. |
 | Send stays `pending` | No receipt yet; the recipient's receiver may be offline. Do not resend; `ace outbox retry` retries now. See Messages and delivery in SKILL.md. |
 | `rejected` with `unsupported_schema` | The peer has not installed that profile or version. Agree on a profile both have (`ace network profiles`). |
 | Stays `pending` although the peer is online | Either the peer no longer admits you (its messages from strangers are dropped without a receipt; check `ace network peers` for `admitted` / `canSend`), or an attempt fell beyond the peer's replay horizon (dropped, never receipted; `replay_horizon` is not a receipt code). Either way the entry stays `pending` and the next retry, freshly signed, can still be delivered: do not send a duplicate. |

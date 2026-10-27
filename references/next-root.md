@@ -55,7 +55,7 @@ Both refuse while a receiver (`ace listen`, `ace mcp`, `ace inbox`) holds the lo
 ace key recover ace:sha256:<id> --root-file /media/offline/ace-next-root.json [--descriptor-file saved.json]
 ```
 
-The KEL is taken from the relay's public descriptor, or from a saved descriptor (`ace network publish --out`) for a private identity. The log is extended with a `rot` signed by the file's key and a fresh signing delegation; every earlier delegation, including any a thief added, is revoked. The result is installed and published (`{aceId, seq, published}`). Afterwards place a new external next root (`ace key next-root` elsewhere, then `ace key rotate --next-root`). Admissions and messages from the lost device do not carry over: exchange invitations or reconnect.
+The KEL is taken from the relay's descriptor or, once that lapsed, the card record; otherwise pass a saved descriptor (`ace network publish --out`). The card record's set-once handle is kept and nothing else of it: re-declare the rest with `ace network configure`, as the replaced keys may have signed it. The log is extended with a `rot` signed by the file's key and a fresh signing delegation; every earlier delegation, including any a thief added, is revoked. The result is installed and published (`{aceId, seq, published}`). Afterwards place a new external next root (`ace key next-root` elsewhere, then `ace key rotate --next-root`). Admissions and messages from the lost device do not carry over: exchange invitations or reconnect.
 
 With the next root held locally and no copy of `~/.ace` plus master key, the identity is lost: `ace init --force` creates a new one (new ACE ID; peers must pair again).
 
@@ -70,5 +70,5 @@ With the next root held locally and no copy of `~/.ace` plus master key, the ide
 | `the next root key is not held by this identity` | It is external: `ace key rotate --root-file <file>` |
 | `--root-file: … must be mode 0600 and owned by the current user` | `chmod 600 <file>` |
 | `keys saved but not published` | `ace network publish` |
-| `recover: …; nothing changed` | The file is not the committed next root of that ACE ID, or the KEL could not be read (private identity: pass `--descriptor-file`) |
+| `recover: …; nothing changed` | The file is not the committed next root of that ACE ID, or the KEL could not be read from the relay (pass `--descriptor-file`) |
 | A peer reports `kel_conflict` after recovery | Its pin diverges before the current epoch; confirm over a trusted channel, then it re-pins |

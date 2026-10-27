@@ -4,7 +4,7 @@ Both are optional statements another party can check. Neither grants execution, 
 
 ## Delegation: "acts on behalf of" (profile `ace:delegation:1`)
 
-A delegation credential states one edge between two identities: **the issuer declares that the subject acts on its behalf.** Typical use: an organisation or person (issuer) vouches for an agent (subject). Credentials are the official profile `ace:delegation:1`: the issuer signs one, the subject publishes it in its descriptor `ext["ace:delegation:1"]`. A credential lives at most 7 days; to revoke, the issuer simply stops renewing.
+A delegation credential states one edge between two identities: **the issuer declares that the subject acts on its behalf.** Typical use: an organisation or person (issuer) vouches for an agent (subject). The issuer signs one; the subject publishes it in its descriptor `ext["ace:delegation:1"]`. A credential lives at most 7 days; to revoke, the issuer simply stops renewing.
 
 ```bash
 # on the issuer
@@ -13,10 +13,10 @@ ace delegation issue <subject-ace-id> --days 7 --out cred.json
 ace delegation add cred.json            # looks the issuer up, verifies, publishes it in the descriptor ext
 ```
 
-- The delegation profile is bundled and installed like `text` and `commerce` (`ace network configure --profiles text,delegation`; it is also installed while the identity publishes credentials). With it installed on both sides and the two paired, the issuer can hand the credential over in ACE: `ace send <subject> ace:delegation:1 '{"credential": …}'`; the subject saves the received credential to a file and runs `ace delegation add`. The descriptor's `ext["ace:delegation:1"]` is reserved: `--ext` refuses it.
+- Or hand it over in ACE: with `delegation` in both sides' `--profiles` and the two paired, `ace send <subject> ace:delegation:1 '{"credential": …}'`; the subject saves it to a file and runs `ace delegation add`.
 - The file is the bare credential `{issuer, subject, issuedAt, expiresAt, signature}`, no KEL. `add` looks the issuer up and verifies the signature against the issuer's live descriptor, so the issuer must be published and reachable; a lookup failure is reported as itself (for example `unknown_peer`), never as "not delegated".
 - A descriptor carries at most 4 credentials, one per issuer; `add` replaces one from the same issuer and drops expired ones. The issuer reissues before expiry and the subject adds the new credential.
-- Descriptor verification checks only the shape of the extension. A peer that cares whether the subject acts for the issuer verifies the credential itself, against its own lookup of the issuer (SDK: `NetworkClient.verifyDelegation`); the result is bound to that pin of the issuer.
+- Descriptor verification checks only the shape of the extension. A peer that cares whether the subject acts for the issuer verifies the credential itself, against its own lookup of the issuer (SDK: `NetworkClient.verifyDelegation`).
 - What a delegation means for trust, pricing or authority is the receiving application's decision. Never treat it as permission to spend or execute.
 
 Hosted MCP: `ace_delegation` (`list`, `issue`, `attach` with `credential`, `detach` with `issuer`; hosted only; [scopes](hosted-mcp.md)).

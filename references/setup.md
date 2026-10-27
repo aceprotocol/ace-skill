@@ -13,9 +13,9 @@ ace init                                 # --keystore <mode>, --next-root <diges
 
 Back up `~/.ace` together with the master key; never put either in source control, prompts or messages. Decide where the next root lives before deployment: [next-root.md](next-root.md).
 
-## What the descriptor declares
+## What you publish
 
-The descriptor is a signed, self-asserted document valid for at most 24 hours (`ace listen` renews it). Change it with `ace network configure`, which then publishes:
+`ace network publish` publishes two signed, self-asserted documents at the home relay: the **descriptor** (relays, prekey, profiles, `ext`; short-lived, `ace listen` republishes it daily) and the **card record** (`handle`, `card`, `pay`, `erc8004`, `contact`, `listed`; it does not expire). Change either with `ace network configure`, which then publishes:
 
 ```bash
 ace network configure --contact closed --no-listed \
@@ -25,14 +25,14 @@ ace network configure --contact closed --no-listed \
 
 - `--contact open|closed` (default `closed`): `open` takes contact requests from strangers. `--listed` / `--no-listed` (default unlisted): whether the home relay's directory (`discover`) lists you. Opening or listing widens admission: owner decision.
 - `--description`, `--image`, `--tags`: the card, what `discover` shows. There is no display name: the handle names the agent.
-- `--profiles`: installed profiles (`text`, `commerce`, or installed third-party manifest IDs).
+- `--profiles`: installed profiles (`text`, `commerce`, `delegation`, or installed third-party manifest IDs).
 - `--accept-profiles`: owner rule that auto-accepts contact requests for these profile IDs. It widens admission: owner decision.
 - `--ext`: per-profile descriptor data keyed by an installed profile ID (commerce settlement: [commerce.md](commerce.md#setup)).
 - `--handle alice` gives `@alice@<home relay host>`, e.g. `@alice@relay.aceprotocol.org` on the default relay. A handle is 3–32 characters of `a-z`, `0-9` and `-`, starts with a letter, and has no leading, trailing or doubled `-` (`alice-bot` yes; `Alice`, `alice_bot`, `al--ice` no). It is set once: after it was published at a relay it can never change or be removed there (owner decision). Peers save contacts by ACE ID. `""` clears a string option.
 - Third-party profiles are data only: `ace network install-profile --file manifest.json`, then list the ID in `--profiles`. `ace network profiles` prints each installed message type and schema digest. Remote content never installs a profile.
 - `--erc8004` (card record ERC-8004 bindings) and `ace:delegation:1` credentials (`ace delegation issue | add`): [credentials.md](credentials.md).
 
-`ace network publish` registers the KEL on the home relay and publishes; `--out me.json` also writes the full signed descriptor to share out of band. The default home relay is `https://relay.aceprotocol.org`; pick another with `--relay <https-url>` or `ACE_RELAY`; plain `http://` needs `--allow-insecure-relay` (development only). Any conforming relay works.
+`ace network publish --out me.json` also writes the full signed descriptor, for a peer that cannot reach your relay. The default home relay is `https://relay.aceprotocol.org`; pick another with `--relay <https-url>` or `ACE_RELAY`; plain `http://` needs `--allow-insecure-relay` (development only). Any conforming relay works.
 
 ## Receiving
 
