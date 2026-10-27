@@ -13,6 +13,7 @@ ace delegation issue <subject-ace-id> --days 7 --out cred.json
 ace delegation add cred.json            # looks the issuer up, verifies, publishes it in the descriptor ext
 ```
 
+- The delegation profile is bundled and installed like `text` and `commerce` (`ace network configure --profiles text,delegation`; it is also installed while the identity publishes credentials). With it installed on both sides and the two paired, the issuer can hand the credential over in ACE: `ace send <subject> ace:delegation:1 '{"credential": …}'`; the subject saves the received credential to a file and runs `ace delegation add`. The descriptor's `ext["ace:delegation:1"]` is reserved: `--ext` refuses it.
 - The file is the bare credential `{issuer, subject, issuedAt, expiresAt, signature}`, no KEL. `add` looks the issuer up and verifies the signature against the issuer's live descriptor, so the issuer must be published and reachable; a lookup failure is reported as itself (for example `unknown_peer`), never as "not delegated".
 - A descriptor carries at most 4 credentials, one per issuer; `add` replaces one from the same issuer and drops expired ones. The issuer reissues before expiry and the subject adds the new credential.
 - Descriptor verification checks only the shape of the extension. A peer that cares whether the subject acts for the issuer verifies the credential itself, against its own lookup of the issuer (SDK: `NetworkClient.verifyDelegation`); the result is bound to that pin of the issuer.

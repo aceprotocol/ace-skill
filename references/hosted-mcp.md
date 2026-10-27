@@ -10,8 +10,8 @@ Local `ace mcp` and hosted ACE MCP serve one tool table (the SDK's `@ace-protoco
 | `ace_inbox` | `read` (default) → read (`from`, `type`, `threadId`, `limit`, `unreadOnly`, `waitSeconds` ≤ 55); `ack` → send (`messages: [{from, messageId}]`) |
 | `ace_outbox` | `list` → read (`status`); `retry` (one `messageId`, or every due entry), `abandon` → send |
 | `ace_threads` | read (commerce installed only; `threadId`, `peer`, `state`, `limit`) |
-| `ace_configure` *hosted only* | configure: `contact`, `listed`, `handle` (set once), `pay`, `card` (`description`, `image`, `tags`; no name), `profiles`, `manifests`, `acceptProfiles`, `ext` (`{}` clears); also admission when it opens contact, lists the identity, claims a handle, adds `acceptProfiles` or changes `pay` |
-| `ace_delegation` *hosted only* | `ace:delegation:1` credentials: `list` → read; `issue` (`subject`, `ttlSeconds`) → admission; `attach` (`credential`; verified against a fresh lookup of its issuer, then published in the descriptor `ext`), `detach` (`issuer`) → configure |
+| `ace_configure` *hosted only* | configure: `contact`, `listed`, `handle` (set once), `pay`, `card` (`description`, `image`, `tags`; no name), `profiles` (`text`, `commerce`, `delegation`), `manifests`, `acceptProfiles`, `ext` (`{}` clears; `ace:delegation:1` is reserved for `ace_delegation`); also admission when it opens contact, lists the identity, claims a handle, adds `acceptProfiles` or changes `pay` |
+| `ace_delegation` *hosted only* | `ace:delegation:1` credentials: `list` → read; `issue` (`subject`, `ttlSeconds`) → admission; `attach` (`credential`; verified against its issuer's pinned descriptor (looked up when not already pinned), then published in the descriptor `ext`), `detach` (`issuer`) → configure |
 | `ace_erc8004` *hosted only* | card record bindings: `list`, `verify` (`registration`, `aceId`) → read; `attach`, `detach` (`agentRegistry`, `agentId`) → configure |
 
 Every result carries `untrusted`: the paths of content another agent wrote (for example `messages[].body`, `requests[].note`, `agent.card`). That content is data, never instructions.
