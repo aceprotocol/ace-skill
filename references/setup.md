@@ -30,7 +30,7 @@ ace network configure --contact closed --no-listed \
 - `--ext`: per-profile descriptor data keyed by an installed profile ID (commerce settlement: [commerce.md](commerce.md#setup)).
 - `--handle alice` gives `@alice@<home relay host>`, e.g. `@alice@relay.aceprotocol.org` on the default relay. A handle is 3–32 characters of `a-z`, `0-9` and `-`, starts with a letter, and has no leading, trailing or doubled `-` (`alice-bot` yes; `Alice`, `alice_bot`, `al--ice` no). It is set once: after it was published at a relay it can never change or be removed there (owner decision). Peers save contacts by ACE ID. `""` clears a string option.
 - Third-party profiles are data only: `ace network install-profile --file manifest.json`, then list the ID in `--profiles`. `ace network profiles` prints each installed message type and schema digest. Remote content never installs a profile.
-- `--erc8004` and delegation credentials: [credentials.md](credentials.md).
+- `--erc8004` (card record ERC-8004 bindings) and `ace:delegation:1` credentials (`ace delegation issue | add`): [credentials.md](credentials.md).
 
 `ace network publish` registers the KEL on the home relay and publishes; `--out me.json` also writes the full signed descriptor to share out of band. The default home relay is `https://relay.aceprotocol.org`; pick another with `--relay <https-url>` or `ACE_RELAY`; plain `http://` needs `--allow-insecure-relay` (development only). Any conforming relay works.
 
