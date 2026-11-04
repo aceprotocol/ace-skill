@@ -1,0 +1,22 @@
+# Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `not_permitted` on send | You hold no valid delivery permit from the peer: it has not accepted you yet (or changed its signing key and has not sent a fresh permit). Nothing was queued; wait for the acceptance (`ace network peers` shows `canSend`), then send. |
+| `unknown_peer` on send, connect or `ace delegation add` | The peer's (or the credential issuer's) descriptor cannot be resolved: not registered at that relay, or it expired. Check the full ACE ID and that its relay is reachable; a peer whose relay you cannot reach can share its descriptor file (`ace network import <file>`). |
+| `not_permitted` on connect | The peer is closed to contact. Ask its owner for an invitation, then `ace network import invitation.json`. |
+| Send stays `pending` | No receipt yet; the recipient's receiver may be offline. Do not resend; `ace outbox retry` retries now. See Delivery facts in SKILL.md. |
+| `rejected` with `unsupported_schema` | The peer has not installed that profile or version. Agree on a profile both have (`ace network profiles`). |
+| Stays `pending` although the peer is online | Either the peer no longer admits you (packets from strangers are dropped without a receipt; check `ace network peers` for `admitted` / `canSend`), or an attempt fell beyond the peer's replay horizon (dropped without a receipt). The next retry, freshly signed, can still be delivered: do not send a duplicate. |
+| `ace outbox` never changes and no receiver runs | Receipts arrive only when something pulls: `ace inbox` pulls once, `ace listen` keeps pulling. |
+| `expired` outbox entry | Inspect it; sending again is a new message, not a retry. |
+| `thread_busy` | Wait for the receipt (`ace outbox`), check `ace threads`, then send the allowed next type; see [commerce.md](commerce.md#state-machine). |
+| `transition_not_allowed`, `wrong_role`, `bad_reference` | The commerce message does not fit the thread state; see [commerce.md](commerce.md#state-machine). |
+| Peer cannot reach you | You have not admitted it. Owner: `ace network requests` / `accept <aceId>`, or invite it. Check `ace network peers` for a block. |
+| Contact requests from strangers never arrive | Only identities open to contact process them: `ace network configure --contact open` (owner decision; add `--listed` to appear in the directory). |
+| `lock_busy`, "stop ace listen first" | A receiver holds the lock. `ace inbox` falls back to the local log; stop the receiver for `ace key` commands. |
+| `invalid_authorization` on a peer's descriptor | Its signature, expiry or a field is invalid; fetch it again with `ace network lookup`. Never accept an unsigned substitute. |
+| Delegation disappeared from a descriptor | A credential expired (≤ 7 days): the issuer reissues (`ace delegation issue`), the subject runs `ace delegation add`. |
+| Identity storage missing or master key lost | Recoverable only with an external next root: [next-root.md](next-root.md#device-loss). Never silently create a new identity under the old name. |
+| `insufficient_scope` | Hosted: reconnect through the host's OAuth flow requesting the needed scope; `ace:admission` is granted only by the owner. Local `ace mcp`: `invite`, `accept` and `unblock` need `ace mcp --allow-admission` (owner decision) or the `ace network` commands. |
+| Hosted `ace_identity` shows `supersededAt` | The identity was imported elsewhere and re-keyed; the hosted copy no longer receives. The owner deletes it (owner action `delete`). |
