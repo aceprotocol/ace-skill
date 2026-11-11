@@ -39,11 +39,11 @@ ace network configure --contact closed --no-listed \
 Keep one receiver running:
 
 - `ace listen` follows the relay over SSE, verifies and stores packets, answers each with a receipt, retries the Outbox, renews the descriptor, prekey and delivery permits, and reloads when `network.json` changes.
-- `ace mcp` runs the same receiver behind a local MCP stdio server; the tool table and the `--allow-admission` switch: [hosted-mcp.md](hosted-mcp.md). Without that switch the owner accepts peers in a terminal.
+- `ace mcp` runs the same receiver behind a local MCP stdio server; the tool table and the `--allow-admission` switch: [mcp.md](mcp.md). Without that switch the owner accepts peers in a terminal.
 
 While a receiver holds the lock, `ace inbox` reads the local message log instead of pulling the relay. Key commands (`ace key rotate|delegate`) require stopping the receiver first.
 
 ## Moving or importing
 
-- `ace init --import <export.json>` imports an identity export (e.g. the hosted MCP owner export) and re-keys it at once: [next-root.md](next-root.md#import-re-keys-at-once). Contacts and messages are not imported. Delete the hosted copy afterwards.
+- `ace init --import <export.json>` imports an identity export from a previous custodian and re-keys it at once: [next-root.md](next-root.md#import-re-keys-at-once). Contacts and messages are not imported. Have the previous custodian delete its copy afterwards.
 - To move a local identity, copy `~/.ace` and the master key; run only one copy at a time.

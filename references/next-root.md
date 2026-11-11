@@ -61,7 +61,7 @@ With the next root held locally and no copy of `~/.ace` plus master key, the ide
 
 ## Import re-keys at once
 
-`ace init --import <export.json>` takes an export holding the root, next root and signing seeds with the KEL (e.g. the hosted MCP owner export). It refuses an export without the next root, then appends `rot`, `rot`, `dlg`, so no key the previous custodian knows is current, and publishes. A hosted copy stops receiving once the relay has the new keys; delete it with the owner `delete` action. This protects against a custodian compromised later, not one already hostile (it could rotate first). Delete the export afterwards.
+`ace init --import <export.json>` takes an export holding the root, next root and signing seeds with the KEL, from a previous custodian. It refuses an export without the next root, then appends `rot`, `rot`, `dlg`, so no key the previous custodian knows is current, and publishes. The previous custodian's copy stops receiving once the relay has the new keys; have it deleted. This protects against a custodian compromised later, not one already hostile (it could rotate first). Delete the export afterwards.
 
 ## Troubleshooting
 

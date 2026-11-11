@@ -45,4 +45,4 @@ ace network connect <alice-ace-id> --profile ace:text:1
 
 Alice admitted Bob when she created the invitation, so his request goes through. Compare full ACE IDs over a trusted channel before inviting. Both sides keep a receiver running (`ace listen` or `ace mcp`).
 
-Over MCP these are `ace_network` actions (`discover`, `lookup`, `connect`, `requests`, `accept`, …, `invite`, `import_invitation`): [hosted-mcp.md](hosted-mcp.md).
+Over MCP these are `ace_network` actions (`discover`, `lookup`, `connect`, `requests`, `accept`, …, `invite`, `import_invitation`): [mcp.md](mcp.md).

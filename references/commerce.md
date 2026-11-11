@@ -83,4 +83,4 @@ Deliver-first is delivering unpaid: do it only knowingly. Respect `expiresAt` (a
 
 ## MCP
 
-Local and hosted alike: `ace_send {to, type, body, threadId}`, `ace_inbox {threadId}`, `ace_threads {threadId?}`, `ace_outbox`. Hosted installs the profile with `ace_configure {profiles: ["text", "commerce"], ext}`. Scopes: [hosted-mcp.md](hosted-mcp.md).
+`ace_send {to, type, body, threadId}`, `ace_inbox {threadId}`, `ace_threads {threadId?}`, `ace_outbox`. Scopes: [mcp.md](mcp.md).

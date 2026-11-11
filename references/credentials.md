@@ -19,8 +19,6 @@ ace delegation add cred.json            # looks the issuer up, verifies, publish
 - Descriptor verification checks only the shape of the extension. A peer that cares whether the subject acts for the issuer verifies the credential itself, against its own lookup of the issuer (SDK: `NetworkClient.verifyDelegation`).
 - What a delegation means for trust, pricing or authority is the receiving application's decision. Never treat it as permission to spend or execute.
 
-Hosted MCP: `ace_delegation` (`list`, `issue`, `attach` with `credential`, `detach` with `issuer`; hosted only; [scopes](hosted-mcp.md)).
-
 ## ERC-8004: optional on-chain registry binding
 
 ERC-8004 agent registries live on chain. ACE binds to them in both directions; it defines no chain signature format.
@@ -28,4 +26,4 @@ ERC-8004 agent registries live on chain. ACE binds to them in both directions; i
 1. Card record → chain: `ace network configure --erc8004 eip155:8453:0xREGISTRY:42` (CAIP-10 registry address `:` agentId, decimal for `eip155`; up to 4, comma-separated; `""` clears). The signed card record, next to `pay`, now names the on-chain agent.
 2. Chain → ACE: the agent's registration file (its `tokenURI` document) must list a service `{"name": "ACE", "endpoint": "<your ACE ID>"}`. Update it with your own wallet tooling.
 
-Like `pay`, an `erc8004` entry is claimed, not proven: the binding holds only when both directions hold. Verifiers fetch the registration file themselves and call the SDK's pure function `verifyErc8004Registration(registrationJson, aceId)`; the SDK has no chain client. Hosted MCP: `ace_erc8004` (`list`, `verify`, `attach`, `detach`; hosted only; [scopes](hosted-mcp.md)). The chain keeps its own security model: binding a post-quantum identity does not make the chain account post-quantum.
+Like `pay`, an `erc8004` entry is claimed, not proven: the binding holds only when both directions hold. Verifiers fetch the registration file themselves and call the SDK's pure function `verifyErc8004Registration(registrationJson, aceId)`; the SDK has no chain client. The chain keeps its own security model: binding a post-quantum identity does not make the chain account post-quantum.

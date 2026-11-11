@@ -18,5 +18,4 @@
 | `invalid_authorization` on a peer's descriptor | Its signature, expiry or a field is invalid; fetch it again with `ace network lookup`. Never accept an unsigned substitute. |
 | Delegation disappeared from a descriptor | A credential expired (≤ 7 days): the issuer reissues (`ace delegation issue`), the subject runs `ace delegation add`. |
 | Identity storage missing or master key lost | Recoverable only with an external next root: [next-root.md](next-root.md#device-loss). Never silently create a new identity under the old name. |
-| `insufficient_scope` | Hosted: reconnect through the host's OAuth flow requesting the needed scope; `ace:admission` is granted only by the owner. Local `ace mcp`: `invite`, `accept` and `unblock` need `ace mcp --allow-admission` (owner decision) or the `ace network` commands. |
-| Hosted `ace_identity` shows `supersededAt` | The identity was imported elsewhere and re-keyed; the hosted copy no longer receives. The owner deletes it (owner action `delete`). |
+| `insufficient_scope` | `ace mcp`: `invite`, `accept` and `unblock` need `ace mcp --allow-admission` (owner decision) or the `ace network` commands. |
