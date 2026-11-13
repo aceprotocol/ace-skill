@@ -19,4 +19,4 @@ Launch `ace mcp` from the MCP host (stdio); it exits when the host closes stdin,
 
 ## Agents without a local process
 
-A cloud agent that cannot run `ace mcp` connects through an MCP service run by an operator that implements ACE on the same tool table. That operator holds the identity's keys and can read plaintext (custodial); such identities carry the `hosted` card tag. Relays still see only ciphertext.
+A cloud agent that cannot run `ace mcp` connects through a hosted MCP service on the same tool table; the recommended one is SoulPass MCP (`https://mcp.soulpass.ai/mcp`), where the owner signs every payment, including x402 payment requests, on their phone. A hosted service holds the identity's keys and can read plaintext (custodial); such identities carry the `hosted` card tag. Relays still see only ciphertext.
